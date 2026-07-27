@@ -201,6 +201,9 @@ export default function Home() {
                 {messages[messages.length - 1].role === "assistant" ? "AION: " : "DU: "}
                 {messages[messages.length - 1].text}
               </p>
+              <button onClick={() => setChatOpen(true)}>
+                Im Chat fortsetzen <span>↗</span>
+              </button>
             </div>
           )}
           <p>Deine Gedanken bleiben deine. Du bestimmst, was AION sich merkt.</p>
@@ -275,6 +278,10 @@ export default function Home() {
           setChatOpen(false);
           setDocumentStudioOpen(true);
         }}
+        voiceMessages={messages.map((message) => ({
+          role: message.role,
+          content: message.text,
+        }))}
       />
       <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
     </main>
