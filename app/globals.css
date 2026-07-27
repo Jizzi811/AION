@@ -599,6 +599,262 @@ footer > span {
   justify-self: end;
 }
 
+.chat-backdrop {
+  position: fixed;
+  z-index: 110;
+  inset: 0;
+  display: grid;
+  padding: 28px;
+  place-items: center;
+  background: rgba(3, 2, 9, 0.78);
+  backdrop-filter: blur(24px);
+}
+
+.aion-chat {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr) auto;
+  width: min(760px, 100%);
+  height: min(780px, calc(100vh - 56px));
+  overflow: hidden;
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 10% 0%, rgba(var(--accent-rgb), 0.12), transparent 24rem),
+    rgba(9, 8, 19, 0.98);
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.62);
+}
+
+.chat-header {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 15px;
+  align-items: center;
+  padding: 22px 25px;
+  border-bottom: 1px solid var(--line);
+}
+
+.chat-header h2 {
+  margin: 3px 0 0;
+  font-size: 25px;
+}
+
+.chat-header small {
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.chat-header > button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.chat-orb {
+  display: grid;
+  width: 43px;
+  height: 43px;
+  place-items: center;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, white, var(--accent) 20%, #745be9 55%, transparent 72%);
+  box-shadow: 0 0 27px rgba(var(--accent-rgb), 0.45);
+}
+
+.chat-orb span {
+  width: 57px;
+  height: 57px;
+  border: 1px solid rgba(var(--accent-rgb), 0.35);
+  border-radius: 50%;
+  animation: orbit 7s linear infinite;
+}
+
+.chat-messages {
+  overflow-y: auto;
+  padding: 28px;
+}
+
+.chat-welcome {
+  display: grid;
+  min-height: 100%;
+  align-content: center;
+  justify-items: center;
+}
+
+.chat-welcome > p {
+  width: min(450px, 100%);
+  margin: 0 0 24px;
+  color: #aaa7b9;
+  font-family: Georgia, serif;
+  font-size: 19px;
+  line-height: 1.55;
+  text-align: center;
+}
+
+.chat-welcome > div {
+  display: grid;
+  width: min(500px, 100%);
+  gap: 8px;
+}
+
+.chat-welcome > div button,
+.chat-document-link {
+  display: flex;
+  justify-content: space-between;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.035);
+  color: #c8c5d4;
+  cursor: pointer;
+  font-size: 11px;
+  text-align: left;
+}
+
+.chat-welcome button:hover {
+  border-color: rgba(var(--accent-rgb), 0.35);
+  color: white;
+}
+
+.chat-document-link {
+  gap: 10px;
+  justify-content: center;
+  margin-top: 18px;
+  border-color: rgba(var(--accent-rgb), 0.2);
+  color: var(--accent);
+}
+
+.chat-message {
+  width: min(86%, 590px);
+  margin-bottom: 17px;
+}
+
+.chat-message.user {
+  margin-left: auto;
+}
+
+.chat-message small {
+  display: block;
+  margin: 0 8px 6px;
+  color: #716e80;
+  font-size: 8px;
+  letter-spacing: 0.15em;
+}
+
+.chat-message.user small {
+  text-align: right;
+}
+
+.chat-message p {
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px 16px 16px 5px;
+  background: rgba(255, 255, 255, 0.045);
+  color: #dddbe7;
+  font-size: 12px;
+  line-height: 1.7;
+  white-space: pre-wrap;
+}
+
+.chat-message.user p {
+  border-color: rgba(var(--accent-rgb), 0.2);
+  border-radius: 16px 16px 5px 16px;
+  background: rgba(var(--accent-rgb), 0.08);
+}
+
+.chat-thinking {
+  display: flex;
+  gap: 5px;
+  align-items: center;
+  color: #777486;
+  font-size: 9px;
+}
+
+.chat-thinking i {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--accent);
+  animation: pulse 1.1s ease-in-out infinite alternate;
+}
+
+.chat-thinking i:nth-child(2) {
+  animation-delay: 0.18s;
+}
+
+.chat-thinking i:nth-child(3) {
+  animation-delay: 0.36s;
+}
+
+.chat-thinking span {
+  margin-left: 5px;
+}
+
+.chat-composer {
+  padding: 16px 22px 20px;
+  border-top: 1px solid var(--line);
+  background: rgba(5, 4, 11, 0.65);
+}
+
+.chat-composer > p {
+  margin: 0 0 8px;
+  color: #ff9caa;
+  font-size: 9px;
+}
+
+.chat-composer > div {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
+  align-items: end;
+  padding: 8px 8px 8px 15px;
+  border: 1px solid rgba(var(--accent-rgb), 0.2);
+  border-radius: 17px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+.chat-composer textarea {
+  min-height: 43px;
+  max-height: 140px;
+  padding: 7px 0;
+  border: 0;
+  outline: 0;
+  resize: none;
+  background: transparent;
+  color: white;
+  font-size: 12px;
+  line-height: 1.5;
+}
+
+.chat-composer button {
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 13px;
+  background: linear-gradient(145deg, var(--accent), #a78aff);
+  color: #080711;
+  cursor: pointer;
+  font-size: 20px;
+}
+
+.chat-composer button:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.chat-composer > small {
+  display: block;
+  margin-top: 8px;
+  color: #646172;
+  font-size: 8px;
+  text-align: center;
+}
+
 .studio-backdrop {
   position: fixed;
   z-index: 100;
@@ -717,6 +973,41 @@ footer > span {
 .studio-editor {
   padding: 28px;
   border-right: 1px solid var(--line);
+}
+
+.aion-document-tools {
+  display: flex;
+  gap: 7px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+.aion-document-tools > span {
+  margin-right: auto;
+  color: #79e9ff;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+}
+
+.aion-document-tools button {
+  padding: 7px 9px;
+  border: 1px solid rgba(121, 233, 255, 0.15);
+  border-radius: 8px;
+  background: rgba(121, 233, 255, 0.045);
+  color: #aaa8ba;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.aion-document-tools button:hover {
+  border-color: rgba(121, 233, 255, 0.35);
+  color: white;
+}
+
+.aion-document-tools button:disabled {
+  cursor: wait;
+  opacity: 0.45;
 }
 
 .file-dropzone {
@@ -935,6 +1226,13 @@ footer > span {
   }
 }
 
+@keyframes pulse {
+  to {
+    opacity: 0.25;
+    transform: translateY(-3px);
+  }
+}
+
 @keyframes orbit-reverse {
   from {
     transform: rotate(58deg);
@@ -1121,6 +1419,37 @@ footer > span {
     padding: 0;
   }
 
+  .chat-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .aion-chat {
+    width: 100%;
+    height: 94vh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .chat-header {
+    padding: 18px;
+  }
+
+  .chat-header h2 {
+    font-size: 21px;
+  }
+
+  .chat-messages {
+    padding: 20px 16px;
+  }
+
+  .chat-message {
+    width: 92%;
+  }
+
+  .chat-composer {
+    padding: 13px 14px 18px;
+  }
+
   .document-studio {
     max-height: 94vh;
     border-radius: 24px 24px 0 0;
@@ -1158,6 +1487,15 @@ footer > span {
   .studio-editor {
     padding: 20px;
     border-right: 0;
+  }
+
+  .aion-document-tools {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .aion-document-tools > span {
+    grid-column: 1 / -1;
   }
 
   .studio-editor textarea {
