@@ -14,6 +14,7 @@ type AionChatProps = {
   open: boolean;
   onClose: () => void;
   onOpenDocuments: () => void;
+  voiceMessages?: Message[];
 };
 
 const modeNames: Record<AionMode, string> = {
@@ -46,12 +47,29 @@ const starters: Record<AionMode, string[]> = {
   ],
 };
 
-export function AionChat({ mode, open, onClose, onOpenDocuments }: AionChatProps) {
+export function AionChat({
+  mode,
+  open,
+  onClose,
+  onOpenDocuments,
+  voiceMessages = [],
+}: AionChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const importedVoiceCount = useRef(0);
+
+  useEffect(() => {
+    if (voiceMessages.length < importedVoiceCount.current) {
+      importedVoiceCount.current = 0;
+    }
+    if (voiceMessages.length <= importedVoiceCount.current) return;
+    const newMessages = voiceMessages.slice(importedVoiceCount.current);
+    importedVoiceCount.current = voiceMessages.length;
+    setMessages((current) => [...current, ...newMessages].slice(-24));
+  }, [voiceMessages]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({
