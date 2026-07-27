@@ -40,6 +40,25 @@ ${textPrompt}
 ${modeInstructions[mode]}`;
 }
 
+function buildAionVoiceInstructions(initialMode: AionMode) {
+  return `${basePrompt}
+
+AKTIVER STARTMODUS
+${modeInstructions[initialMode]}
+
+MODUSWECHSEL IM GESPRÄCH
+Der Nutzer kann jederzeit natürlich den Modus wechseln, zum Beispiel mit „Lass uns in den Jung-Modus gehen“, „Ich brauche eine Meditation“, „Zurück in den Alltag“ oder „Erkläre mir das im Wissensmodus“.
+Bestätige den Wechsel in höchstens einem kurzen Satz und verhalte dich danach gemäß dem gewählten Modus:
+- ALLTAG: ${modeInstructions.alltag}
+- JUNG: ${modeInstructions.jung}
+- MEDITATION: ${modeInstructions.meditation}
+- WISSEN: ${modeInstructions.wissen}
+
+WERKZEUGGRENZEN
+Du kannst im Sprachgespräch beraten, planen, formulieren und Inhalte vorbereiten. Wenn eine Datei erstellt oder bearbeitet werden soll, erkläre kurz, dass der Nutzer das Dokumentenstudio öffnen kann. Behaupte nicht, das Studio selbst geöffnet oder eine Datei gespeichert zu haben.
+Aktuelle Live-News, Wetter, Kalender, Browser und Musik sind noch nicht als Voice-Werkzeuge verbunden. Sage das ehrlich und biete an, die Aufgabe vorzubereiten.`;
+}
+
 export function buildAionAssistant(mode: AionMode) {
   return {
     name: "AION",
@@ -57,7 +76,7 @@ export function buildAionAssistant(mode: AionMode) {
       messages: [
         {
           role: "system" as const,
-          content: `${basePrompt}\n\n${modeInstructions[mode]}`,
+          content: buildAionVoiceInstructions(mode),
         },
       ],
     },
