@@ -719,6 +719,68 @@ footer > span {
   border-right: 1px solid var(--line);
 }
 
+.file-dropzone {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 20px;
+  padding: 14px 15px;
+  border: 1px dashed rgba(121, 233, 255, 0.2);
+  border-radius: 14px;
+  background: rgba(121, 233, 255, 0.035);
+  transition: 0.2s ease;
+}
+
+.file-dropzone.dragging {
+  border-color: rgba(121, 233, 255, 0.65);
+  background: rgba(121, 233, 255, 0.09);
+  transform: translateY(-2px);
+}
+
+.file-dropzone input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
+
+.file-dropzone strong,
+.file-dropzone span {
+  display: block;
+}
+
+.file-dropzone strong {
+  overflow: hidden;
+  color: #dcd9e8;
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-dropzone span {
+  margin-top: 5px;
+  color: #696678;
+  font-size: 8px;
+}
+
+.file-dropzone button {
+  padding: 9px 11px;
+  border: 1px solid rgba(121, 233, 255, 0.2);
+  border-radius: 9px;
+  background: rgba(121, 233, 255, 0.07);
+  color: #9deeff;
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.file-dropzone button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .studio-editor label,
 .studio-editor label > span {
   display: block;
@@ -1073,6 +1135,14 @@ footer > span {
 
   .studio-editor textarea {
     min-height: 290px;
+  }
+
+  .file-dropzone {
+    grid-template-columns: 1fr;
+  }
+
+  .file-dropzone button {
+    width: 100%;
   }
 
   .format-panel {
