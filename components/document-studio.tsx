@@ -47,8 +47,10 @@ const templates = {
   },
 };
 
-const supportedInput = ".txt,.md,.html,.htm,.csv,.json,.docx,.xlsx,.pptx,.pdf";
+const supportedInput =
+  ".txt,.md,.html,.htm,.csv,.json,.docx,.xlsx,.pptx,.pdf,.png,.jpg,.jpeg,.webp";
 const maxFileSize = 15 * 1024 * 1024;
+const maxOcrPdfPages = 8;
 
 function safeFilename(value: string) {
   return (
@@ -102,6 +104,7 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [sourceFile, setSourceFile] = useState<string | null>(null);
   const [dragging, setDragging] = useState(false);
+  const [ocrProgress, setOcrProgress] = useState<number | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const wordCount = useMemo(
@@ -116,6 +119,37 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
     setNotice(null);
   }
 
+  async function recognizeImages(
+    sources: (File | HTMLCanvasElement)[],
+    pageLabel = "Bild",
+  ) {
+    const { createWorker } = await import("tesseract.js");
+    let activeSource = 0;
+    const worker = await createWorker(["deu", "eng"], undefined, {
+      logger: (message) => {
+        if (message.status !== "recognizing text") return;
+        const overall = (activeSource + message.progress) / sources.length;
+        setOcrProgress(Math.round(overall * 100));
+      },
+    });
+
+    const results: string[] = [];
+    try {
+      for (const [index, source] of sources.entries()) {
+        activeSource = index;
+        setNotice(`AION erkennt Text in ${pageLabel} ${index + 1} von ${sources.length} …`);
+        const result = await worker.recognize(source);
+        const text = result.data.text.trim();
+        if (text) results.push(`${pageLabel} ${index + 1}\n${text}`);
+      }
+    } finally {
+      await worker.terminate();
+      setOcrProgress(null);
+    }
+
+    return results.join("\n\n");
+  }
+
   async function importFile(file: File) {
     if (file.size > maxFileSize) {
       setNotice("Die Datei ist größer als 15 MB. Bitte verwende eine kleinere Datei.");
@@ -123,7 +157,22 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
     }
 
     const extension = extensionOf(file.name);
-    const allowed = ["txt", "md", "html", "htm", "csv", "json", "docx", "xlsx", "pptx", "pdf"];
+    const allowed = [
+      "txt",
+      "md",
+      "html",
+      "htm",
+      "csv",
+      "json",
+      "docx",
+      "xlsx",
+      "pptx",
+      "pdf",
+      "png",
+      "jpg",
+      "jpeg",
+      "webp",
+    ];
     if (!allowed.includes(extension)) {
       setNotice("Dieses Format wird noch nicht unterstützt.");
       return;
@@ -136,7 +185,9 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
       const buffer = await file.arrayBuffer();
       let extracted = "";
 
-      if (["txt", "md", "csv"].includes(extension)) {
+      if (["png", "jpg", "jpeg", "webp"].includes(extension)) {
+        extracted = await recognizeImages([file]);
+      } else if (["txt", "md", "csv"].includes(extension)) {
         extracted = new TextDecoder().decode(buffer);
       } else if (extension === "json") {
         const parsed = JSON.parse(new TextDecoder().decode(buffer)) as unknown;
@@ -200,7 +251,37 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
               .join(" ")}`,
           );
         }
-        extracted = pages.join("\n\n");
+        extracted = pages.join("\n\n").trim();
+
+        const meaningfulText = extracted
+          .replace(/Seite \d+/g, "")
+          .replace(/\s+/g, "")
+          .trim();
+
+        if (meaningfulText.length < 20) {
+          const pageCount = Math.min(pdf.numPages, maxOcrPdfPages);
+          setNotice(
+            pdf.numPages > maxOcrPdfPages
+              ? `Scan erkannt. AION liest aus Sicherheitsgründen zunächst die ersten ${maxOcrPdfPages} Seiten.`
+              : "Scan erkannt. AION startet die lokale Texterkennung …",
+          );
+          const canvases: HTMLCanvasElement[] = [];
+          for (let pageNumber = 1; pageNumber <= pageCount; pageNumber += 1) {
+            const page = await pdf.getPage(pageNumber);
+            const viewport = page.getViewport({ scale: 1.65 });
+            const canvas = document.createElement("canvas");
+            canvas.width = Math.floor(viewport.width);
+            canvas.height = Math.floor(viewport.height);
+            const context = canvas.getContext("2d", { willReadFrequently: true });
+            if (!context) continue;
+            await page.render({ canvas, canvasContext: context, viewport }).promise;
+            canvases.push(canvas);
+          }
+          extracted = await recognizeImages(canvases, "Seite");
+          if (pdf.numPages > maxOcrPdfPages && extracted) {
+            extracted += `\n\nHinweis: Die PDF enthält ${pdf.numPages} Seiten. OCR wurde für die ersten ${maxOcrPdfPages} Seiten ausgeführt.`;
+          }
+        }
       }
 
       if (!extracted.trim()) {
@@ -213,8 +294,8 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
       setNotice(`${file.name} wurde lokal eingelesen. Wähle jetzt das gewünschte Ausgabeformat.`);
     } catch {
       setNotice(
-        extension === "pdf"
-          ? "Aus dieser PDF ließ sich kein Text lesen. Bei einem Scan wird später die OCR-Funktion benötigt."
+        ["pdf", "png", "jpg", "jpeg", "webp"].includes(extension)
+          ? "Die Texterkennung ist fehlgeschlagen. Die Datei ist möglicherweise geschützt, zu undeutlich oder beschädigt."
           : "Die Datei konnte nicht gelesen werden. Sie ist möglicherweise geschützt oder beschädigt.",
       );
     } finally {
@@ -423,12 +504,20 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
                   />
                   <div>
                     <strong>{sourceFile ? `Geöffnet: ${sourceFile}` : "Vorhandenes Dokument öffnen"}</strong>
-                    <span>Hier ablegen oder Datei auswählen · maximal 15 MB</span>
+                    <span>Dokument oder Scan ablegen · maximal 15 MB</span>
                   </div>
                   <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>
                     {busy ? "Wird gelesen …" : "Datei wählen"}
                   </button>
                 </div>
+                {ocrProgress !== null && (
+                  <div className="ocr-progress" aria-live="polite">
+                    <div>
+                      <span style={{ width: `${ocrProgress}%` }} />
+                    </div>
+                    <p>Lokale Texterkennung · {ocrProgress}%</p>
+                  </div>
+                )}
                 <label>
                   <span>Titel</span>
                   <input value={title} onChange={(event) => setTitle(event.target.value)} />
