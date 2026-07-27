@@ -10,6 +10,8 @@ type DocumentStudioProps = {
   onClose: () => void;
 };
 
+type DocumentAction = "zusammenfassen" | "verbessern" | "strukturieren";
+
 const formats: { id: DocumentFormat; label: string; description: string }[] = [
   { id: "pdf", label: "PDF", description: "Fertig zum Teilen" },
   { id: "docx", label: "Word", description: "Weiterbearbeitbar" },
@@ -117,6 +119,51 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
     setContent(templates[key].content);
     setSourceFile(null);
     setNotice(null);
+  }
+
+  async function runAionAction(action: DocumentAction) {
+    if (!content.trim() || busy) {
+      setNotice("Öffne oder schreibe zuerst ein Dokument.");
+      return;
+    }
+
+    const instructions: Record<DocumentAction, string> = {
+      zusammenfassen:
+        "Fasse das Dokument präzise zusammen. Erhalte wichtige Fakten, Entscheidungen, Termine und offene Punkte.",
+      verbessern:
+        "Überarbeite das Dokument sprachlich. Mache es klar, professionell und gut lesbar, ohne Fakten hinzuzuerfinden.",
+      strukturieren:
+        "Strukturiere das Dokument sinnvoll mit passenden Überschriften, Absätzen und Aufzählungen. Erhalte den vollständigen Inhalt.",
+    };
+
+    setBusy(true);
+    setNotice(`AION beginnt: ${action} …`);
+
+    try {
+      const response = await fetch("/api/aion", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          mode: "alltag",
+          messages: [{ role: "user", content: instructions[action] }],
+          document: { title, content },
+        }),
+      });
+      const result = (await response.json()) as { message?: string; error?: string };
+      if (!response.ok || !result.message) {
+        throw new Error(result.error || "AION konnte das Dokument nicht bearbeiten.");
+      }
+      setContent(result.message);
+      setNotice(`AION hat das Dokument ${action === "verbessern" ? "verbessert" : action === "strukturieren" ? "strukturiert" : "zusammengefasst"}.`);
+    } catch (actionError) {
+      setNotice(
+        actionError instanceof Error
+          ? actionError.message
+          : "AION konnte das Dokument nicht bearbeiten.",
+      );
+    } finally {
+      setBusy(false);
+    }
   }
 
   async function recognizeImages(
@@ -476,6 +523,18 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
               </aside>
 
               <div className="studio-editor">
+                <div className="aion-document-tools">
+                  <span>AION KI</span>
+                  <button onClick={() => void runAionAction("zusammenfassen")} disabled={busy}>
+                    Zusammenfassen
+                  </button>
+                  <button onClick={() => void runAionAction("verbessern")} disabled={busy}>
+                    Verbessern
+                  </button>
+                  <button onClick={() => void runAionAction("strukturieren")} disabled={busy}>
+                    Strukturieren
+                  </button>
+                </div>
                 <div
                   className={`file-dropzone ${dragging ? "dragging" : ""}`}
                   onDragEnter={(event) => {
