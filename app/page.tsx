@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AionChat } from "@/components/aion-chat";
+import { CalendarStudio } from "@/components/calendar-studio";
 import { DocumentStudio } from "@/components/document-studio";
 import { useAionVoice } from "@/hooks/use-aion-voice";
 import type { AionMode } from "@/lib/aion-assistant";
@@ -44,7 +45,7 @@ const modes: Record<
 };
 
 const actions = [
-  { icon: "☼", title: "Mein Morgen", text: "Wetter, Termine & Fokus" },
+  { icon: "☼", title: "Mein Morgen", text: "Wetter, Termine & Fokus", calendarStudio: true },
   { icon: "▱", title: "Dokumente", text: "PDF, Word, Excel & mehr", documentStudio: true },
   { icon: "◐", title: "Jung-Modus", text: "Innere Muster erkunden", mode: "jung" as Mode },
   { icon: "◌", title: "Zur Ruhe", text: "Meditation & Körperreise", mode: "meditation" as Mode },
@@ -54,6 +55,7 @@ const actions = [
 export default function Home() {
   const [activeMode, setActiveMode] = useState<Mode>("alltag");
   const [documentStudioOpen, setDocumentStudioOpen] = useState(false);
+  const [calendarStudioOpen, setCalendarStudioOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const { state: voiceState, error, messages, start: toggleVoice } =
     useAionVoice(activeMode);
@@ -74,6 +76,7 @@ export default function Home() {
         </a>
         <nav aria-label="Hauptnavigation">
           <a href="#moeglichkeiten">Möglichkeiten</a>
+          <button className="nav-link" onClick={() => setCalendarStudioOpen(true)}>Kalender</button>
           <button className="nav-link" onClick={() => setDocumentStudioOpen(true)}>Dokumente</button>
           <a href="#balance">Balance</a>
           <a href="#privacy">Privatsphäre</a>
@@ -222,6 +225,7 @@ export default function Home() {
               className="action-card"
               onClick={() => {
                 if (action.documentStudio) setDocumentStudioOpen(true);
+                if (action.calendarStudio) setCalendarStudioOpen(true);
                 if (action.mode) {
                   setActiveMode(action.mode);
                   setChatOpen(true);
@@ -284,6 +288,7 @@ export default function Home() {
         }))}
       />
       <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
+      <CalendarStudio open={calendarStudioOpen} onClose={() => setCalendarStudioOpen(false)} />
     </main>
   );
 }
