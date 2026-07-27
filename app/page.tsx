@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { AionChat } from "@/components/aion-chat";
 import { DocumentStudio } from "@/components/document-studio";
 import { useAionVoice } from "@/hooks/use-aion-voice";
 import type { AionMode } from "@/lib/aion-assistant";
@@ -53,6 +54,7 @@ const actions = [
 export default function Home() {
   const [activeMode, setActiveMode] = useState<Mode>("alltag");
   const [documentStudioOpen, setDocumentStudioOpen] = useState(false);
+  const [chatOpen, setChatOpen] = useState(false);
   const { state: voiceState, error, messages, start: toggleVoice } =
     useAionVoice(activeMode);
   const active = modes[activeMode];
@@ -76,7 +78,7 @@ export default function Home() {
           <a href="#balance">Balance</a>
           <a href="#privacy">Privatsphäre</a>
         </nav>
-        <button className="nav-button" onClick={toggleVoice}>
+        <button className="nav-button" onClick={() => setChatOpen(true)}>
           AION öffnen <span>↗</span>
         </button>
       </header>
@@ -116,7 +118,10 @@ export default function Home() {
               <button
                 key={mode}
                 className={activeMode === mode ? "active" : ""}
-                onClick={() => setActiveMode(mode)}
+                onClick={() => {
+                  setActiveMode(mode);
+                  setChatOpen(true);
+                }}
               >
                 <span>{modes[mode].icon}</span>
                 {modes[mode].label}
@@ -214,7 +219,10 @@ export default function Home() {
               className="action-card"
               onClick={() => {
                 if (action.documentStudio) setDocumentStudioOpen(true);
-                if (action.mode) setActiveMode(action.mode);
+                if (action.mode) {
+                  setActiveMode(action.mode);
+                  setChatOpen(true);
+                }
               }}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -259,6 +267,15 @@ export default function Home() {
         <p>Wissen. Bewusstsein. Balance.</p>
         <span>© 2026 Nadj.ai</span>
       </footer>
+      <AionChat
+        mode={activeMode}
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        onOpenDocuments={() => {
+          setChatOpen(false);
+          setDocumentStudioOpen(true);
+        }}
+      />
       <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
     </main>
   );
