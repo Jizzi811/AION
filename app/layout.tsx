@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Starter Project",
-  description: "A clean starting point for building your site.",
+  title: "AION by Nadj.ai",
+  description: "Dein intelligenter Voice-Begleiter für Alltag, Wissen und innere Balance.",
   other: {
     "codex-preview": "development",
   },
@@ -30,7 +30,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="de">
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
