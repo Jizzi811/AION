@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 type DocumentFormat = "pdf" | "docx" | "xlsx" | "pptx" | "md" | "html" | "txt" | "csv";
@@ -47,6 +47,9 @@ const templates = {
   },
 };
 
+const supportedInput = ".txt,.md,.html,.htm,.csv,.json,.docx,.xlsx,.pptx,.pdf";
+const maxFileSize = 15 * 1024 * 1024;
+
 function safeFilename(value: string) {
   return (
     value
@@ -78,12 +81,28 @@ function escapeHtml(value: string) {
     .replaceAll('"', "&quot;");
 }
 
+function stripHtml(value: string) {
+  const document = new DOMParser().parseFromString(value, "text/html");
+  return document.body.textContent?.replace(/\n{3,}/g, "\n\n").trim() || "";
+}
+
+function extensionOf(filename: string) {
+  return filename.toLowerCase().split(".").pop() || "";
+}
+
+function titleFromFilename(filename: string) {
+  return filename.replace(/\.[^.]+$/, "").replace(/[-_]+/g, " ").trim() || "Importiertes Dokument";
+}
+
 export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
   const [title, setTitle] = useState(templates.frei.title);
   const [content, setContent] = useState(templates.frei.content);
   const [format, setFormat] = useState<DocumentFormat>("pdf");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
+  const [sourceFile, setSourceFile] = useState<string | null>(null);
+  const [dragging, setDragging] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const wordCount = useMemo(
     () => content.trim().split(/\s+/).filter(Boolean).length,
@@ -93,7 +112,115 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
   function applyTemplate(key: keyof typeof templates) {
     setTitle(templates[key].title);
     setContent(templates[key].content);
+    setSourceFile(null);
     setNotice(null);
+  }
+
+  async function importFile(file: File) {
+    if (file.size > maxFileSize) {
+      setNotice("Die Datei ist größer als 15 MB. Bitte verwende eine kleinere Datei.");
+      return;
+    }
+
+    const extension = extensionOf(file.name);
+    const allowed = ["txt", "md", "html", "htm", "csv", "json", "docx", "xlsx", "pptx", "pdf"];
+    if (!allowed.includes(extension)) {
+      setNotice("Dieses Format wird noch nicht unterstützt.");
+      return;
+    }
+
+    setBusy(true);
+    setNotice(`AION liest ${file.name} …`);
+
+    try {
+      const buffer = await file.arrayBuffer();
+      let extracted = "";
+
+      if (["txt", "md", "csv"].includes(extension)) {
+        extracted = new TextDecoder().decode(buffer);
+      } else if (extension === "json") {
+        const parsed = JSON.parse(new TextDecoder().decode(buffer)) as unknown;
+        extracted = JSON.stringify(parsed, null, 2);
+      } else if (extension === "html" || extension === "htm") {
+        extracted = stripHtml(new TextDecoder().decode(buffer));
+      } else if (extension === "docx") {
+        const mammoth = await import("mammoth");
+        const result = await mammoth.extractRawText({ arrayBuffer: buffer });
+        extracted = result.value;
+      } else if (extension === "xlsx") {
+        const ExcelJS = await import("exceljs");
+        const workbook = new ExcelJS.Workbook();
+        await workbook.xlsx.load(buffer);
+        const sheets: string[] = [];
+        workbook.eachSheet((sheet) => {
+          const rows: string[] = [];
+          sheet.eachRow((row) => {
+            const values = Array.isArray(row.values) ? row.values.slice(1) : [];
+            rows.push(
+              values
+                .map((value) => (value == null ? "" : String(value)))
+                .join(" | "),
+            );
+          });
+          sheets.push(`${sheet.name}\n${rows.join("\n")}`);
+        });
+        extracted = sheets.join("\n\n");
+      } else if (extension === "pptx") {
+        const JSZip = (await import("jszip")).default;
+        const archive = await JSZip.loadAsync(buffer);
+        const slideNames = Object.keys(archive.files)
+          .filter((name) => /^ppt\/slides\/slide\d+\.xml$/.test(name))
+          .sort((a, b) => Number(a.match(/\d+/)?.[0]) - Number(b.match(/\d+/)?.[0]));
+        const slides: string[] = [];
+        for (const [index, name] of slideNames.entries()) {
+          const xml = await archive.file(name)?.async("string");
+          if (!xml) continue;
+          const parsed = new DOMParser().parseFromString(xml, "application/xml");
+          const text = Array.from(parsed.getElementsByTagName("a:t"))
+            .map((node) => node.textContent || "")
+            .filter(Boolean)
+            .join("\n");
+          slides.push(`Folie ${index + 1}\n${text}`);
+        }
+        extracted = slides.join("\n\n");
+      } else if (extension === "pdf") {
+        const pdfjs = await import("pdfjs-dist");
+        pdfjs.GlobalWorkerOptions.workerSrc = new URL(
+          "pdfjs-dist/build/pdf.worker.min.mjs",
+          import.meta.url,
+        ).toString();
+        const pdf = await pdfjs.getDocument({ data: new Uint8Array(buffer) }).promise;
+        const pages: string[] = [];
+        for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+          const page = await pdf.getPage(pageNumber);
+          const text = await page.getTextContent();
+          pages.push(
+            `Seite ${pageNumber}\n${text.items
+              .map((item) => ("str" in item ? item.str : ""))
+              .join(" ")}`,
+          );
+        }
+        extracted = pages.join("\n\n");
+      }
+
+      if (!extracted.trim()) {
+        throw new Error("empty");
+      }
+
+      setTitle(titleFromFilename(file.name));
+      setContent(extracted.trim());
+      setSourceFile(file.name);
+      setNotice(`${file.name} wurde lokal eingelesen. Wähle jetzt das gewünschte Ausgabeformat.`);
+    } catch {
+      setNotice(
+        extension === "pdf"
+          ? "Aus dieser PDF ließ sich kein Text lesen. Bei einem Scan wird später die OCR-Funktion benötigt."
+          : "Die Datei konnte nicht gelesen werden. Sie ist möglicherweise geschützt oder beschädigt.",
+      );
+    } finally {
+      setBusy(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
   }
 
   async function createDocument() {
@@ -268,6 +395,40 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
               </aside>
 
               <div className="studio-editor">
+                <div
+                  className={`file-dropzone ${dragging ? "dragging" : ""}`}
+                  onDragEnter={(event) => {
+                    event.preventDefault();
+                    setDragging(true);
+                  }}
+                  onDragOver={(event) => event.preventDefault()}
+                  onDragLeave={(event) => {
+                    if (event.currentTarget === event.target) setDragging(false);
+                  }}
+                  onDrop={(event) => {
+                    event.preventDefault();
+                    setDragging(false);
+                    const file = event.dataTransfer.files[0];
+                    if (file) void importFile(file);
+                  }}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    accept={supportedInput}
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void importFile(file);
+                    }}
+                  />
+                  <div>
+                    <strong>{sourceFile ? `Geöffnet: ${sourceFile}` : "Vorhandenes Dokument öffnen"}</strong>
+                    <span>Hier ablegen oder Datei auswählen · maximal 15 MB</span>
+                  </div>
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+                    {busy ? "Wird gelesen …" : "Datei wählen"}
+                  </button>
+                </div>
                 <label>
                   <span>Titel</span>
                   <input value={title} onChange={(event) => setTitle(event.target.value)} />
@@ -279,7 +440,7 @@ export function DocumentStudio({ open, onClose }: DocumentStudioProps) {
                 <div className="editor-meta">
                   <span>{wordCount} Wörter</span>
                   <span>{content.length} Zeichen</span>
-                  <span>lokale Verarbeitung</span>
+                  <span>{sourceFile ? "lokal importiert" : "lokale Verarbeitung"}</span>
                 </div>
               </div>
 
