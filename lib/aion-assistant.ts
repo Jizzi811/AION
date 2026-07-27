@@ -48,7 +48,7 @@ export function buildAionAssistant(mode: AionMode) {
     },
     voice: {
       provider: "11labs" as const,
-      voiceId: "pFQStpMdprGFILRDrWR2",
+      voiceId: "R3XXDwKMU2YHwBcuYUH3",
       model: "eleven_turbo_v2_5" as const,
       language: "de",
       stability: mode === "meditation" ? 0.58 : 0.45,
