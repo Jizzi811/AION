@@ -7,6 +7,8 @@ import type { AionMode } from "@/lib/aion-assistant";
 type Message = {
   role: "user" | "assistant";
   content: string;
+  live?: boolean;
+  sources?: { title: string; url: string }[];
 };
 
 type AionChatProps = {
@@ -27,8 +29,8 @@ const modeNames: Record<AionMode, string> = {
 const starters: Record<AionMode, string[]> = {
   alltag: [
     "Plane meinen Tag mit mir",
+    "Wie wird das Wetter heute in meiner Stadt?",
     "Formuliere eine wichtige Nachricht",
-    "Hilf mir, eine Entscheidung zu sortieren",
   ],
   jung: [
     "Lass uns ein wiederkehrendes Muster betrachten",
@@ -41,9 +43,9 @@ const starters: Record<AionMode, string[]> = {
     "Hilf mir, vor dem Schlafen loszulassen",
   ],
   wissen: [
+    "Fasse die wichtigsten Nachrichten von heute zusammen",
+    "Wie wird das Wetter heute?",
     "Erkläre mir ein komplexes Thema einfach",
-    "Prüfe meine Argumentation",
-    "Fasse mir einen Text verständlich zusammen",
   ],
 };
 
@@ -94,13 +96,23 @@ export function AionChat({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ mode, messages: nextMessages }),
       });
-      const result = (await response.json()) as { message?: string; error?: string };
+      const result = (await response.json()) as {
+        message?: string;
+        error?: string;
+        live?: boolean;
+        sources?: { title: string; url: string }[];
+      };
       if (!response.ok || !result.message) {
         throw new Error(result.error || "AION konnte nicht antworten.");
       }
       setMessages((current) => [
         ...current,
-        { role: "assistant", content: result.message as string },
+        {
+          role: "assistant",
+          content: result.message as string,
+          live: result.live,
+          sources: result.sources,
+        },
       ]);
     } catch (requestError) {
       setError(
@@ -165,8 +177,25 @@ export function AionChat({
               ) : (
                 messages.map((message, index) => (
                   <div key={`${message.role}-${index}`} className={`chat-message ${message.role}`}>
-                    <small>{message.role === "assistant" ? "AION" : "DU"}</small>
+                    <small>
+                      {message.role === "assistant" ? "AION" : "DU"}
+                      {message.live ? " · LIVE RECHERCHIERT" : ""}
+                    </small>
                     <p>{message.content}</p>
+                    {message.sources && message.sources.length > 0 && (
+                      <div className="chat-sources">
+                        {message.sources.map((source) => (
+                          <a
+                            key={source.url}
+                            href={source.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {source.title}<span>↗</span>
+                          </a>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 ))
               )}
