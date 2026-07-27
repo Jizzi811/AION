@@ -781,6 +781,33 @@ footer > span {
   opacity: 0.55;
 }
 
+.ocr-progress {
+  margin: -8px 0 18px;
+}
+
+.ocr-progress > div {
+  overflow: hidden;
+  height: 3px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.ocr-progress > div span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, #79f5d3, #79e9ff, #c9a5ff);
+  box-shadow: 0 0 12px rgba(121, 233, 255, 0.5);
+  transition: width 0.25s ease;
+}
+
+.ocr-progress p {
+  margin: 7px 0 0;
+  color: #777488;
+  font-size: 8px;
+  text-align: right;
+}
+
 .studio-editor label,
 .studio-editor label > span {
   display: block;
