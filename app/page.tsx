@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
+import { DocumentStudio } from "@/components/document-studio";
 import { useAionVoice } from "@/hooks/use-aion-voice";
 import type { AionMode } from "@/lib/aion-assistant";
 
@@ -43,6 +44,7 @@ const modes: Record<
 
 const actions = [
   { icon: "☼", title: "Mein Morgen", text: "Wetter, Termine & Fokus" },
+  { icon: "▱", title: "Dokumente", text: "PDF, Word, Excel & mehr", documentStudio: true },
   { icon: "◐", title: "Jung-Modus", text: "Innere Muster erkunden", mode: "jung" as Mode },
   { icon: "◌", title: "Zur Ruhe", text: "Meditation & Körperreise", mode: "meditation" as Mode },
   { icon: "⌁", title: "Aktuell", text: "News & Wissen auf den Punkt", mode: "wissen" as Mode },
@@ -50,6 +52,7 @@ const actions = [
 
 export default function Home() {
   const [activeMode, setActiveMode] = useState<Mode>("alltag");
+  const [documentStudioOpen, setDocumentStudioOpen] = useState(false);
   const { state: voiceState, error, messages, start: toggleVoice } =
     useAionVoice(activeMode);
   const active = modes[activeMode];
@@ -69,6 +72,7 @@ export default function Home() {
         </a>
         <nav aria-label="Hauptnavigation">
           <a href="#moeglichkeiten">Möglichkeiten</a>
+          <button className="nav-link" onClick={() => setDocumentStudioOpen(true)}>Dokumente</button>
           <a href="#balance">Balance</a>
           <a href="#privacy">Privatsphäre</a>
         </nav>
@@ -208,7 +212,10 @@ export default function Home() {
             <motion.button
               key={action.title}
               className="action-card"
-              onClick={() => action.mode && setActiveMode(action.mode)}
+              onClick={() => {
+                if (action.documentStudio) setDocumentStudioOpen(true);
+                if (action.mode) setActiveMode(action.mode);
+              }}
               initial={{ opacity: 0, y: 24 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true, amount: 0.4 }}
@@ -252,6 +259,7 @@ export default function Home() {
         <p>Wissen. Bewusstsein. Balance.</p>
         <span>© 2026 Nadj.ai</span>
       </footer>
+      <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
     </main>
   );
 }
