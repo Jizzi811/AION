@@ -767,6 +767,35 @@ footer > span {
   background: rgba(var(--accent-rgb), 0.08);
 }
 
+.chat-sources {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.chat-sources a {
+  overflow: hidden;
+  max-width: 220px;
+  padding: 6px 9px;
+  border: 1px solid rgba(var(--accent-rgb), 0.16);
+  border-radius: 999px;
+  color: #9693a6;
+  font-size: 8px;
+  text-decoration: none;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.chat-sources a:hover {
+  border-color: rgba(var(--accent-rgb), 0.4);
+  color: var(--accent);
+}
+
+.chat-sources span {
+  margin-left: 5px;
+}
+
 .chat-thinking {
   display: flex;
   gap: 5px;
