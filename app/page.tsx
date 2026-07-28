@@ -282,6 +282,10 @@ export default function Home() {
           setChatOpen(false);
           setDocumentStudioOpen(true);
         }}
+        onOpenCalendar={() => {
+          setChatOpen(false);
+          setCalendarStudioOpen(true);
+        }}
         voiceMessages={messages.map((message) => ({
           role: message.role,
           content: message.text,
