@@ -9,6 +9,18 @@ type Message = {
   content: string;
   live?: boolean;
   sources?: { title: string; url: string }[];
+  calendarAction?: CalendarAction;
+  calendarConnectionRequired?: boolean;
+};
+
+type CalendarAction = {
+  kind: "create" | "update" | "delete";
+  eventId: string;
+  title: string;
+  start: string;
+  end: string;
+  location: string;
+  summary: string;
 };
 
 type AionChatProps = {
@@ -16,6 +28,7 @@ type AionChatProps = {
   open: boolean;
   onClose: () => void;
   onOpenDocuments: () => void;
+  onOpenCalendar: () => void;
   voiceMessages?: Message[];
 };
 
@@ -54,12 +67,14 @@ export function AionChat({
   open,
   onClose,
   onOpenDocuments,
+  onOpenCalendar,
   voiceMessages = [],
 }: AionChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [calendarBusy, setCalendarBusy] = useState<number | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const importedVoiceCount = useRef(0);
 
@@ -101,6 +116,8 @@ export function AionChat({
         error?: string;
         live?: boolean;
         sources?: { title: string; url: string }[];
+        calendarAction?: CalendarAction;
+        calendarConnectionRequired?: boolean;
       };
       if (!response.ok || !result.message) {
         throw new Error(result.error || "AION konnte nicht antworten.");
@@ -112,6 +129,8 @@ export function AionChat({
           content: result.message as string,
           live: result.live,
           sources: result.sources,
+          calendarAction: result.calendarAction,
+          calendarConnectionRequired: result.calendarConnectionRequired,
         },
       ]);
     } catch (requestError) {
@@ -123,6 +142,78 @@ export function AionChat({
     } finally {
       setBusy(false);
     }
+  }
+
+  async function confirmCalendarAction(action: CalendarAction, messageIndex: number) {
+    setCalendarBusy(messageIndex);
+    setError(null);
+    try {
+      const method =
+        action.kind === "create" ? "POST" : action.kind === "update" ? "PATCH" : "DELETE";
+      const response = await fetch("/api/calendar", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: action.eventId,
+          title: action.title,
+          start: action.start,
+          end: action.end,
+          location: action.location,
+          confirmed: true,
+        }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Kalenderaktion fehlgeschlagen.");
+      setMessages((current) =>
+        current.map((message, index) =>
+          index === messageIndex
+            ? { ...message, calendarAction: undefined }
+            : message,
+        ).concat({
+          role: "assistant",
+          content:
+            action.kind === "create"
+              ? "Erledigt – der Termin steht jetzt in deinem Kalender."
+              : action.kind === "update"
+                ? "Erledigt – ich habe den Termin geändert."
+                : "Erledigt – der Termin wurde gelöscht.",
+        }),
+      );
+    } catch (requestError) {
+      setError(
+        requestError instanceof Error
+          ? requestError.message
+          : "Kalenderaktion fehlgeschlagen.",
+      );
+    } finally {
+      setCalendarBusy(null);
+    }
+  }
+
+  function dismissCalendarAction(messageIndex: number) {
+    setMessages((current) =>
+      current.map((message, index) =>
+        index === messageIndex ? { ...message, calendarAction: undefined } : message,
+      ),
+    );
+  }
+
+  function formatCalendarAction(action: CalendarAction) {
+    if (action.kind === "delete") return "Dauerhaft aus dem Kalender entfernen";
+    const start = new Intl.DateTimeFormat("de-DE", {
+      weekday: "short",
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Berlin",
+    }).format(new Date(action.start));
+    const end = new Intl.DateTimeFormat("de-DE", {
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Europe/Berlin",
+    }).format(new Date(action.end));
+    return `${start}–${end} Uhr${action.location ? ` · ${action.location}` : ""}`;
   }
 
   function submit(event: FormEvent) {
@@ -194,6 +285,40 @@ export function AionChat({
                             {source.title}<span>↗</span>
                           </a>
                         ))}
+                      </div>
+                    )}
+                    {message.calendarConnectionRequired && (
+                      <button className="chat-calendar-connect" onClick={onOpenCalendar}>
+                        Google Calendar verbinden <span>↗</span>
+                      </button>
+                    )}
+                    {message.calendarAction && (
+                      <div className={`chat-calendar-action ${message.calendarAction.kind}`}>
+                        <small>
+                          {message.calendarAction.kind === "create"
+                            ? "TERMIN ANLEGEN"
+                            : message.calendarAction.kind === "update"
+                              ? "TERMIN ÄNDERN"
+                              : "TERMIN LÖSCHEN"}
+                        </small>
+                        <strong>{message.calendarAction.title}</strong>
+                        <span>{formatCalendarAction(message.calendarAction)}</span>
+                        <div>
+                          <button
+                            onClick={() => dismissCalendarAction(index)}
+                            disabled={calendarBusy === index}
+                          >
+                            Abbrechen
+                          </button>
+                          <button
+                            onClick={() =>
+                              void confirmCalendarAction(message.calendarAction as CalendarAction, index)
+                            }
+                            disabled={calendarBusy === index}
+                          >
+                            {calendarBusy === index ? "Wird ausgeführt …" : "Jetzt bestätigen"}
+                          </button>
+                        </div>
                       </div>
                     )}
                   </div>
