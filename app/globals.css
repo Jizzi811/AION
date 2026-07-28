@@ -796,6 +796,96 @@ footer > span {
   margin-left: 5px;
 }
 
+.chat-calendar-connect {
+  margin-top: 10px;
+  padding: 9px 12px;
+  border: 1px solid rgba(var(--accent-rgb), 0.25);
+  border-radius: 10px;
+  background: rgba(var(--accent-rgb), 0.08);
+  color: var(--accent);
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.chat-calendar-action {
+  margin-top: 10px;
+  padding: 15px;
+  border: 1px solid rgba(var(--accent-rgb), 0.24);
+  border-radius: 15px;
+  background:
+    radial-gradient(circle at 100% 0%, rgba(var(--accent-rgb), 0.11), transparent 12rem),
+    rgba(7, 6, 15, 0.86);
+}
+
+.chat-calendar-action.delete {
+  border-color: rgba(255, 139, 157, 0.26);
+}
+
+.chat-calendar-action > small,
+.chat-calendar-action > strong,
+.chat-calendar-action > span {
+  display: block;
+}
+
+.chat-calendar-action > small {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+}
+
+.chat-calendar-action.delete > small {
+  color: #f0a9b6;
+}
+
+.chat-calendar-action > strong {
+  color: #ebe8f2;
+  font-family: Georgia, serif;
+  font-size: 17px;
+  font-weight: 400;
+}
+
+.chat-calendar-action > span {
+  margin-top: 6px;
+  color: #8e8b9e;
+  font-size: 9px;
+  line-height: 1.5;
+}
+
+.chat-calendar-action > div {
+  display: flex;
+  justify-content: end;
+  gap: 7px;
+  margin-top: 14px;
+}
+
+.chat-calendar-action button {
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #aaa7b8;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.chat-calendar-action button:last-child {
+  border: 0;
+  background: linear-gradient(110deg, var(--accent), #b2a5ff);
+  color: #080711;
+  font-weight: 700;
+}
+
+.chat-calendar-action.delete button:last-child {
+  background: linear-gradient(110deg, #f0a9b6, #d694ff);
+}
+
+.chat-calendar-action button:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .chat-thinking {
   display: flex;
   gap: 5px;
