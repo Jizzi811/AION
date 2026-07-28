@@ -53,6 +53,8 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
   const [notice, setNotice] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [confirming, setConfirming] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [pendingDelete, setPendingDelete] = useState<CalendarEvent | null>(null);
 
   async function loadCalendar(signal?: AbortSignal) {
     setBusy(true);
@@ -95,7 +97,7 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
     setConfirming(true);
   }
 
-  async function createEvent() {
+  async function saveEvent() {
     const start = new Date(`${draft.date}T${draft.time}:00`);
     const end = new Date(start.getTime() + Number(draft.duration) * 60_000);
     setBusy(true);
@@ -103,9 +105,10 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
 
     try {
       const response = await fetch("/api/calendar", {
-        method: "POST",
+        method: editingId ? "PATCH" : "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          id: editingId,
           title: draft.title,
           location: draft.location,
           start: start.toISOString(),
@@ -114,13 +117,69 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
         }),
       });
       const result = (await response.json()) as { error?: string };
-      if (!response.ok) throw new Error(result.error || "Termin konnte nicht angelegt werden.");
+      if (!response.ok) throw new Error(result.error || "Termin konnte nicht gespeichert werden.");
       setDraft(emptyDraft);
+      setEditingId(null);
       setConfirming(false);
-      setNotice("Der Termin wurde in Google Calendar angelegt.");
+      setNotice(
+        editingId
+          ? "Die Änderung wurde in Google Calendar gespeichert."
+          : "Der Termin wurde in Google Calendar angelegt.",
+      );
       await loadCalendar();
     } catch (error) {
-      setNotice(error instanceof Error ? error.message : "Termin konnte nicht angelegt werden.");
+      setNotice(error instanceof Error ? error.message : "Termin konnte nicht gespeichert werden.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function editEvent(event: CalendarEvent) {
+    if (!event.id || !event.start || event.allDay) {
+      setNotice("Ganztägige Termine bearbeitest du vorerst direkt in Google Calendar.");
+      return;
+    }
+    const start = new Date(event.start);
+    const end = event.end ? new Date(event.end) : new Date(start.getTime() + 60 * 60_000);
+    const berlinDate = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      timeZone: "Europe/Berlin",
+    }).format(start);
+    const berlinTime = new Intl.DateTimeFormat("de-DE", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+      timeZone: "Europe/Berlin",
+    }).format(start);
+    setEditingId(event.id);
+    setDraft({
+      title: event.title,
+      date: berlinDate,
+      time: berlinTime,
+      duration: String(Math.max(15, Math.round((end.getTime() - start.getTime()) / 60_000))),
+      location: event.location || "",
+    });
+    setNotice("Termin geladen – ändere die Angaben und prüfe sie anschließend.");
+  }
+
+  async function deleteEvent() {
+    if (!pendingDelete?.id) return;
+    setBusy(true);
+    try {
+      const response = await fetch("/api/calendar", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: pendingDelete.id, confirmed: true }),
+      });
+      const result = (await response.json()) as { error?: string };
+      if (!response.ok) throw new Error(result.error || "Termin konnte nicht gelöscht werden.");
+      setPendingDelete(null);
+      setNotice("Der Termin wurde aus Google Calendar gelöscht.");
+      await loadCalendar();
+    } catch (error) {
+      setNotice(error instanceof Error ? error.message : "Termin konnte nicht gelöscht werden.");
     } finally {
       setBusy(false);
     }
@@ -185,24 +244,27 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
                   ) : (
                     <div className="calendar-events">
                       {events.map((event) => (
-                        <a
+                        <article
                           key={event.id || `${event.title}-${event.start}`}
-                          href={event.url}
-                          target="_blank"
-                          rel="noreferrer"
                         >
-                          <time>{formatEventDate(event.start, event.allDay)}</time>
-                          <strong>{event.title}</strong>
-                          {event.location && <span>{event.location}</span>}
-                        </a>
+                          <a href={event.url} target="_blank" rel="noreferrer">
+                            <time>{formatEventDate(event.start, event.allDay)}</time>
+                            <strong>{event.title}</strong>
+                            {event.location && <span>{event.location}</span>}
+                          </a>
+                          <div className="calendar-event-actions">
+                            <button onClick={() => editEvent(event)}>Ändern</button>
+                            <button onClick={() => setPendingDelete(event)}>Löschen</button>
+                          </div>
+                        </article>
                       ))}
                     </div>
                   )}
                 </div>
 
                 <form className="calendar-create" onSubmit={previewEvent}>
-                  <small>NEUER TERMIN</small>
-                  <h3>Für dich eintragen</h3>
+                  <small>{editingId ? "TERMIN ÄNDERN" : "NEUER TERMIN"}</small>
+                  <h3>{editingId ? "Änderung vorbereiten" : "Für dich eintragen"}</h3>
                   <label>
                     <span>Titel</span>
                     <input
@@ -239,6 +301,9 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
                       <option value="60">1 Stunde</option>
                       <option value="90">1,5 Stunden</option>
                       <option value="120">2 Stunden</option>
+                      {!["30", "60", "90", "120"].includes(draft.duration) && (
+                        <option value={draft.duration}>{draft.duration} Minuten</option>
+                      )}
                     </select>
                   </label>
                   <label>
@@ -250,8 +315,21 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
                     />
                   </label>
                   <button className="calendar-preview-button" disabled={busy}>
-                    Termin prüfen <span>→</span>
+                    {editingId ? "Änderung prüfen" : "Termin prüfen"} <span>→</span>
                   </button>
+                  {editingId && (
+                    <button
+                      type="button"
+                      className="calendar-cancel-edit"
+                      onClick={() => {
+                        setEditingId(null);
+                        setDraft(emptyDraft);
+                        setNotice(null);
+                      }}
+                    >
+                      Bearbeitung abbrechen
+                    </button>
+                  )}
                   {notice && <p className="calendar-notice">{notice}</p>}
                 </form>
               </div>
@@ -266,11 +344,32 @@ export function CalendarStudio({ open, onClose }: CalendarStudioProps) {
                     {formatEventDate(`${draft.date}T${draft.time}:00`)} · {draft.duration} Minuten
                     {draft.location ? ` · ${draft.location}` : ""}
                   </p>
-                  <span>Der Termin wird privat in deinem Hauptkalender angelegt.</span>
+                  <span>
+                    {editingId
+                      ? "Der bestehende Termin wird erst nach deiner Bestätigung geändert."
+                      : "Der Termin wird privat in deinem Hauptkalender angelegt."}
+                  </span>
                   <div>
                     <button onClick={() => setConfirming(false)}>Noch ändern</button>
-                    <button onClick={() => void createEvent()} disabled={busy}>
-                      Verbindlich eintragen
+                    <button onClick={() => void saveEvent()} disabled={busy}>
+                      {editingId ? "Änderung speichern" : "Verbindlich eintragen"}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {pendingDelete && (
+              <div className="calendar-confirm">
+                <div>
+                  <small>LÖSCHEN BESTÄTIGEN</small>
+                  <h3>{pendingDelete.title}</h3>
+                  <p>{formatEventDate(pendingDelete.start, pendingDelete.allDay)}</p>
+                  <span>Dieser Termin wird dauerhaft aus deinem Google Calendar entfernt.</span>
+                  <div>
+                    <button onClick={() => setPendingDelete(null)}>Abbrechen</button>
+                    <button onClick={() => void deleteEvent()} disabled={busy}>
+                      Endgültig löschen
                     </button>
                   </div>
                 </div>
