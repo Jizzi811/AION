@@ -63,11 +63,12 @@ const livePatterns = [
   /\b202[5-9]\b/,
 ];
 const calendarPatterns = [
-  /\bkalender\b/i,
-  /\btermin\b/i,
+  /\bkalender\w*/i,
+  /\b\w*termin\w*/i,
   /\bverabredung\b/i,
   /\bmeeting\b/i,
   /\beintragen\b/i,
+  /\btrag\w*\b.*\bein\b/i,
   /\bverschieb/i,
   /\babsag/i,
   /\blösch/i,
