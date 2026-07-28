@@ -11,6 +11,16 @@ type GoogleEvent = {
   end?: { dateTime?: string; date?: string };
 };
 
+type CalendarWriteBody = {
+  id?: string;
+  title?: string;
+  start?: string;
+  end?: string;
+  location?: string;
+  description?: string;
+  confirmed?: boolean;
+};
+
 function calendarHeaders(accessToken: string) {
   return {
     Authorization: `Bearer ${accessToken}`,
@@ -70,14 +80,7 @@ export async function POST(request: Request) {
     return Response.json({ error: "Google Calendar ist nicht verbunden." }, { status: 401 });
   }
 
-  const body = (await request.json()) as {
-    title?: string;
-    start?: string;
-    end?: string;
-    location?: string;
-    description?: string;
-    confirmed?: boolean;
-  };
+  const body = (await request.json()) as CalendarWriteBody;
   const title = body.title?.trim().slice(0, 200);
   const start = body.start ? new Date(body.start) : null;
   const end = body.end ? new Date(body.end) : null;
@@ -129,4 +132,89 @@ export async function POST(request: Request) {
       url: event.htmlLink,
     },
   });
+}
+
+export async function PATCH(request: Request) {
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    return Response.json({ error: "Google Calendar ist nicht verbunden." }, { status: 401 });
+  }
+
+  const body = (await request.json()) as CalendarWriteBody;
+  const id = body.id?.trim();
+  const title = body.title?.trim().slice(0, 200);
+  const start = body.start ? new Date(body.start) : null;
+  const end = body.end ? new Date(body.end) : null;
+
+  if (
+    !body.confirmed ||
+    !id ||
+    !title ||
+    !start ||
+    !end ||
+    Number.isNaN(start.getTime()) ||
+    Number.isNaN(end.getTime()) ||
+    end <= start
+  ) {
+    return Response.json(
+      { error: "Bitte bestätige die vollständige Änderung mit gültiger Zeit." },
+      { status: 400 },
+    );
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`,
+    {
+      method: "PATCH",
+      headers: calendarHeaders(accessToken),
+      body: JSON.stringify({
+        summary: title,
+        location: body.location?.trim().slice(0, 300) || "",
+        description: body.description?.trim().slice(0, 4_000) || undefined,
+        start: { dateTime: start.toISOString(), timeZone: "Europe/Berlin" },
+        end: { dateTime: end.toISOString(), timeZone: "Europe/Berlin" },
+      }),
+    },
+  );
+  const event = (await response.json()) as GoogleEvent & { error?: { message?: string } };
+  if (!response.ok) {
+    return Response.json(
+      { error: event.error?.message || "Der Termin konnte nicht geändert werden." },
+      { status: 502 },
+    );
+  }
+
+  return Response.json({ event });
+}
+
+export async function DELETE(request: Request) {
+  const accessToken = await getAccessToken();
+  if (!accessToken) {
+    return Response.json({ error: "Google Calendar ist nicht verbunden." }, { status: 401 });
+  }
+
+  const body = (await request.json()) as { id?: string; confirmed?: boolean };
+  const id = body.id?.trim();
+  if (!body.confirmed || !id) {
+    return Response.json(
+      { error: "Das Löschen muss ausdrücklich bestätigt werden." },
+      { status: 400 },
+    );
+  }
+
+  const response = await fetch(
+    `https://www.googleapis.com/calendar/v3/calendars/primary/events/${encodeURIComponent(id)}`,
+    { method: "DELETE", headers: calendarHeaders(accessToken) },
+  );
+  if (!response.ok && response.status !== 410) {
+    const result = (await response.json().catch(() => null)) as
+      | { error?: { message?: string } }
+      | null;
+    return Response.json(
+      { error: result?.error?.message || "Der Termin konnte nicht gelöscht werden." },
+      { status: 502 },
+    );
+  }
+
+  return Response.json({ deleted: true });
 }
