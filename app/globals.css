@@ -1057,21 +1057,46 @@ footer > span {
   gap: 8px;
 }
 
+.calendar-events article {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: center;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.028);
+}
+
+.calendar-events article:hover {
+  border-color: rgba(121, 233, 255, 0.25);
+  background: rgba(121, 233, 255, 0.045);
+}
+
 .calendar-events a {
   display: grid;
   grid-template-columns: 100px 1fr;
   gap: 5px 13px;
   padding: 12px 14px;
-  border: 1px solid var(--line);
-  border-radius: 13px;
-  background: rgba(255, 255, 255, 0.028);
   color: inherit;
   text-decoration: none;
 }
 
-.calendar-events a:hover {
-  border-color: rgba(121, 233, 255, 0.25);
-  background: rgba(121, 233, 255, 0.045);
+.calendar-event-actions {
+  display: grid;
+  gap: 4px;
+  padding-right: 9px;
+}
+
+.calendar-event-actions button,
+.calendar-cancel-edit {
+  border: 0;
+  background: transparent;
+  color: #777486;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.calendar-event-actions button:last-child {
+  color: #b88796;
 }
 
 .calendar-events time {
@@ -1166,6 +1191,12 @@ footer > span {
 .calendar-preview-button:disabled {
   cursor: wait;
   opacity: 0.5;
+}
+
+.calendar-cancel-edit {
+  display: block;
+  width: 100%;
+  padding: 9px;
 }
 
 .calendar-notice {
