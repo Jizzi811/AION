@@ -121,11 +121,12 @@ function YouTubeMusicPlayer({
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
-  const [activated, setActivated] = useState(false);
+  const [playerReady, setPlayerReady] = useState(false);
+  const [started, setStarted] = useState(false);
   const [playerError, setPlayerError] = useState(false);
 
   useEffect(() => {
-    if (!activated || !mountRef.current) return;
+    if (!mountRef.current) return;
     let cancelled = false;
 
     void loadYouTubePlayerApi().then(() => {
@@ -133,7 +134,7 @@ function YouTubeMusicPlayer({
       playerRef.current = new window.YT.Player(mountRef.current, {
         videoId: video.id,
         playerVars: {
-          autoplay: 1,
+          autoplay: 0,
           controls: 1,
           playsinline: 1,
           rel: 0,
@@ -142,9 +143,13 @@ function YouTubeMusicPlayer({
         events: {
           onReady: (event) => {
             event.target.setVolume(voiceState === "speaking" ? 18 : 72);
-            event.target.playVideo();
+            setPlayerReady(true);
           },
-          onStateChange: (event) => onPlayingChange(event.data === 1),
+          onStateChange: (event) => {
+            const playing = event.data === 1;
+            if (playing) setStarted(true);
+            onPlayingChange(playing);
+          },
           onError: () => {
             setPlayerError(true);
             onPlayingChange(false);
@@ -159,7 +164,7 @@ function YouTubeMusicPlayer({
       playerRef.current = null;
       onPlayingChange(false);
     };
-  }, [activated, onPlayingChange, video.id]);
+  }, [onPlayingChange, video.id]);
 
   useEffect(() => {
     if (!playerRef.current) return;
@@ -167,7 +172,7 @@ function YouTubeMusicPlayer({
   }, [voiceState]);
 
   return (
-    <div className={`youtube-music-player ${activated ? "active" : ""}`}>
+    <div className={`youtube-music-player ${started ? "active" : ""}`}>
       <div className="youtube-track-copy">
         <span>♫</span>
         <div>
@@ -175,14 +180,19 @@ function YouTubeMusicPlayer({
           <small>{video.channel}</small>
         </div>
       </div>
-      {!activated ? (
-        <button onClick={() => setActivated(true)}>
-          <span>▶</span>
-          Jetzt in AION abspielen
-        </button>
-      ) : (
+      <div className="youtube-player-shell">
         <div className="youtube-player-frame" ref={mountRef} />
-      )}
+        {!started && (
+          <button
+            className="youtube-play-overlay"
+            disabled={!playerReady}
+            onClick={() => playerRef.current?.playVideo()}
+          >
+            <span>▶</span>
+            {playerReady ? "Jetzt in AION abspielen" : "Player wird geladen …"}
+          </button>
+        )}
+      </div>
       {playerError && (
         <a
           href={`https://www.youtube.com/watch?v=${video.id}`}
@@ -310,8 +320,8 @@ export function AionChat({
         }
         const musicAnswer =
           mode === "jung" || mode === "meditation"
-            ? `Gefunden: „${musicResult.video?.title}“. Tippe auf Abspielen, sobald du bereit bist.`
-            : `Gefunden: „${musicResult.video?.title}“. Einmal Abspielen antippen – den Rest erledigen Musik und meine fragwürdigen Tanzkünste.`;
+            ? `Gefunden: „${musicResult.video?.title}“. Tippe im Player auf Abspielen, sobald du bereit bist.`
+            : `Gefunden: „${musicResult.video?.title}“. Einmal im Player auf Abspielen tippen – den Rest erledigen Musik und meine fragwürdigen Tanzkünste.`;
         setMessages((current) => [
           ...current,
           {
