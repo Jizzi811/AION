@@ -313,6 +313,7 @@ export default function Home() {
           calendarAction: message.calendarAction,
           calendarConnectionRequired: message.calendarConnectionRequired,
           musicUrl: message.musicUrl,
+          browserUrl: message.browserUrl,
         }))}
       />
       <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
