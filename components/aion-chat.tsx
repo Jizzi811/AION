@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { AionMode } from "@/lib/aion-assistant";
+import type { VoiceState } from "@/hooks/use-aion-voice";
 
 type YouTubeVideo = {
   id: string;
@@ -39,12 +40,16 @@ type AionChatProps = {
   onOpenDocuments: () => void;
   onOpenCalendar: () => void;
   onMusicPlayingChange: (playing: boolean) => void;
+  voiceState: VoiceState;
+  onToggleVoice: () => void;
+  onSpeak: (text: string) => boolean;
   voiceMessages?: Message[];
 };
 
 type YouTubePlayer = {
   destroy: () => void;
   playVideo: () => void;
+  setVolume: (volume: number) => void;
 };
 
 declare global {
@@ -108,9 +113,11 @@ function extractMusicQuery(text: string) {
 function YouTubeMusicPlayer({
   video,
   onPlayingChange,
+  voiceState,
 }: {
   video: YouTubeVideo;
   onPlayingChange: (playing: boolean) => void;
+  voiceState: VoiceState;
 }) {
   const mountRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YouTubePlayer | null>(null);
@@ -133,7 +140,10 @@ function YouTubeMusicPlayer({
           origin: window.location.origin,
         },
         events: {
-          onReady: (event) => event.target.playVideo(),
+          onReady: (event) => {
+            event.target.setVolume(voiceState === "speaking" ? 18 : 72);
+            event.target.playVideo();
+          },
           onStateChange: (event) => onPlayingChange(event.data === 1),
           onError: () => {
             setPlayerError(true);
@@ -150,6 +160,11 @@ function YouTubeMusicPlayer({
       onPlayingChange(false);
     };
   }, [activated, onPlayingChange, video.id]);
+
+  useEffect(() => {
+    if (!playerRef.current) return;
+    playerRef.current.setVolume(voiceState === "speaking" ? 18 : 72);
+  }, [voiceState]);
 
   return (
     <div className={`youtube-music-player ${activated ? "active" : ""}`}>
@@ -218,6 +233,9 @@ export function AionChat({
   onOpenDocuments,
   onOpenCalendar,
   onMusicPlayingChange,
+  voiceState,
+  onToggleVoice,
+  onSpeak,
   voiceMessages = [],
 }: AionChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -290,17 +308,19 @@ export function AionChat({
         if (!musicResponse.ok || !musicResult.video) {
           throw new Error(musicResult.error || "Ich konnte keinen passenden Titel finden.");
         }
+        const musicAnswer =
+          mode === "jung" || mode === "meditation"
+            ? `Gefunden: „${musicResult.video?.title}“. Tippe auf Abspielen, sobald du bereit bist.`
+            : `Gefunden: „${musicResult.video?.title}“. Einmal Abspielen antippen – den Rest erledigen Musik und meine fragwürdigen Tanzkünste.`;
         setMessages((current) => [
           ...current,
           {
             role: "assistant",
-            content:
-              mode === "jung" || mode === "meditation"
-                ? `Gefunden: „${musicResult.video?.title}“. Tippe auf Abspielen, sobald du bereit bist.`
-                : `Gefunden: „${musicResult.video?.title}“. Einmal Abspielen antippen – den Rest erledigen Musik und meine fragwürdigen Tanzkünste.`,
+            content: musicAnswer,
             youtubeVideo: musicResult.video,
           },
         ]);
+        onSpeak(musicAnswer);
         return;
       }
 
@@ -331,6 +351,7 @@ export function AionChat({
           calendarConnectionRequired: result.calendarConnectionRequired,
         },
       ]);
+      onSpeak(result.message);
     } catch (requestError) {
       setError(
         requestError instanceof Error
@@ -444,7 +465,25 @@ export function AionChat({
                 <small>AION · {modeNames[mode].toUpperCase()}</small>
                 <h2 id="aion-chat-title">Was möchtest du bewegen?</h2>
               </div>
-              <button onClick={onClose} aria-label="AION Chat schließen">×</button>
+              <div className="chat-header-actions">
+                <button
+                  className={`chat-voice-toggle ${voiceState}`}
+                  onClick={onToggleVoice}
+                  aria-label={
+                    voiceState === "idle"
+                      ? "Sprachgespräch mit AION starten"
+                      : "Sprachgespräch mit AION beenden"
+                  }
+                  title={
+                    voiceState === "idle"
+                      ? "Mit AION sprechen"
+                      : "Sprachgespräch beenden"
+                  }
+                >
+                  {voiceState === "idle" ? "●" : "■"}
+                </button>
+                <button onClick={onClose} aria-label="AION Chat schließen">×</button>
+              </div>
             </header>
 
             <div className="chat-messages" ref={scrollRef} aria-live="polite">
@@ -494,6 +533,7 @@ export function AionChat({
                       <YouTubeMusicPlayer
                         video={message.youtubeVideo}
                         onPlayingChange={onMusicPlayingChange}
+                        voiceState={voiceState}
                       />
                     )}
                     {message.browserUrl && (
