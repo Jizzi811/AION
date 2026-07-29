@@ -27,8 +27,15 @@ export type TranscriptItem = {
   text: string;
   calendarAction?: CalendarVoiceAction;
   calendarConnectionRequired?: boolean;
-  musicUrl?: string;
+  youtubeVideo?: YouTubeVideo;
   browserUrl?: string;
+};
+
+export type YouTubeVideo = {
+  id: string;
+  title: string;
+  channel: string;
+  thumbnail: string;
 };
 
 type VapiMessage = {
@@ -75,6 +82,7 @@ const liveVoicePatterns = [
 ];
 const musicVoicePatterns = [
   /\bamazon music\b/i,
+  /\byoutube(?: music)?\b/i,
   /\bmusik\b.*\b(spiel|abspiel|hör|amazon)\w*/i,
   /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i,
 ];
@@ -314,31 +322,66 @@ export function useAionVoice(mode: AionMode) {
 
           if (hasMusicIntent) {
             const musicQuery = transcript
-              .replace(/\b(auf|bei|über|in)\s+amazon music\b/gi, "")
-              .replace(/\bamazon music\b/gi, "")
+              .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
+              .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
               .replace(
                 /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?/i,
                 "",
               )
               .replace(/\s+/g, " ")
               .trim();
-            const musicUrl = musicQuery
-              ? `https://music.amazon.de/search/${encodeURIComponent(musicQuery)}`
-              : "https://music.amazon.de";
-            vapi.stop();
-            setMessages((current) => [
-              ...current,
-              {
-                id: `${Date.now()}-${current.length}`,
-                role: "assistant",
-                text: musicQuery
-                  ? `Ich habe „${musicQuery}“ für Amazon Music vorbereitet. Tippe im Chat auf „In Amazon Music öffnen“.`
-                  : "Ich habe Amazon Music für dich vorbereitet. Tippe im Chat auf „In Amazon Music öffnen“.",
-                musicUrl,
-              },
-            ]);
-            setHandoff({ id: Date.now(), target: "chat" });
-            setState("idle");
+            vapi.say(
+              musicQuery
+                ? modeRef.current === "jung" || modeRef.current === "meditation"
+                  ? `Ich suche ${musicQuery} und öffne dir ganz in Ruhe den Player.`
+                  : `Ich suche ${musicQuery} und öffne dir den Player. Dann darfst du entscheiden, ob meine Tanzkünste versichert werden müssen.`
+                : "Sag mir bitte noch, welchen Titel, Künstler oder welche Musikrichtung du hören möchtest.",
+              false,
+              true,
+              true,
+            );
+            if (!musicQuery) {
+              setState("listening");
+              return;
+            }
+            void fetch(`/api/youtube/search?q=${encodeURIComponent(musicQuery)}`, {
+              cache: "no-store",
+            })
+              .then(async (result) => {
+                const body = (await result.json()) as {
+                  video?: YouTubeVideo;
+                  error?: string;
+                };
+                if (!result.ok || !body.video) {
+                  throw new Error(body.error || "Ich konnte keinen passenden Titel finden.");
+                }
+                vapi.stop();
+                setMessages((current) => [
+                  ...current,
+                  {
+                    id: `${Date.now()}-${current.length}`,
+                    role: "assistant",
+                    text:
+                      modeRef.current === "jung" || modeRef.current === "meditation"
+                        ? `Gefunden: „${body.video?.title}“. Tippe auf Abspielen, sobald du bereit bist.`
+                        : `Gefunden: „${body.video?.title}“. Tippe auf Abspielen – ich übernehme den Tanzteil.`,
+                    youtubeVideo: body.video,
+                  },
+                ]);
+                setHandoff({ id: Date.now(), target: "chat" });
+                setState("idle");
+              })
+              .catch((requestError) => {
+                vapi.say(
+                  requestError instanceof Error
+                    ? requestError.message
+                    : "Ich konnte keinen passenden Titel finden.",
+                  false,
+                  true,
+                  true,
+                );
+                setState("listening");
+              });
             return;
           }
 
