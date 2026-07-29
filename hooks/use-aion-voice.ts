@@ -54,7 +54,7 @@ const mailVoicePatterns = [
   /\bmail\w*\b/i,
 ];
 const voiceYesPattern =
-  /^\s*(ja|ja bitte|bitte|genau|okay|ok|mach das|eintragen|bestätigt)\s*[.!]?\s*$/i;
+  /^\s*(ja|ja bitte|ja genau|ja mach das|bitte|genau|okay|ok|mach das|eintragen|bestätigt)\s*[.!]?\s*$/i;
 const voiceNoPattern =
   /^\s*(nein|abbrechen|stopp|stop|doch nicht|nicht eintragen)\s*[.!]?\s*$/i;
 
