@@ -11,6 +11,7 @@ type Message = {
   sources?: { title: string; url: string }[];
   calendarAction?: CalendarAction;
   calendarConnectionRequired?: boolean;
+  musicUrl?: string;
 };
 
 type CalendarAction = {
@@ -291,6 +292,16 @@ export function AionChat({
                       <button className="chat-calendar-connect" onClick={onOpenCalendar}>
                         Google Calendar verbinden <span>↗</span>
                       </button>
+                    )}
+                    {message.musicUrl && (
+                      <a
+                        className="chat-music-link"
+                        href={message.musicUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        In Amazon Music öffnen <span>↗</span>
+                      </a>
                     )}
                     {message.calendarAction && (
                       <div className={`chat-calendar-action ${message.calendarAction.kind}`}>
