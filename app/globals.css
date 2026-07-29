@@ -540,6 +540,279 @@ h2 {
   gap: 12px;
 }
 
+.translator-backdrop {
+  position: fixed;
+  z-index: 122;
+  inset: 0;
+  display: grid;
+  padding: 28px;
+  place-items: center;
+  background: rgba(3, 2, 9, 0.86);
+  backdrop-filter: blur(24px);
+}
+
+.translator-studio {
+  width: min(1120px, 100%);
+  max-height: min(820px, calc(100vh - 56px));
+  overflow: auto;
+  border: 1px solid rgba(121, 245, 211, 0.24);
+  border-radius: 28px;
+  background:
+    radial-gradient(circle at 8% 0%, rgba(121, 233, 255, 0.13), transparent 25rem),
+    radial-gradient(circle at 92% 100%, rgba(201, 165, 255, 0.12), transparent 26rem),
+    #090812;
+  box-shadow: 0 40px 120px rgba(0, 0, 0, 0.62);
+}
+
+.translator-header {
+  display: flex;
+  align-items: start;
+  justify-content: space-between;
+  padding: 27px 31px;
+  border-bottom: 1px solid var(--line);
+}
+
+.translator-header small,
+.translator-language-row > span,
+.translator-language-row label > span {
+  color: #79f5d3;
+  font-size: 8px;
+  font-weight: 700;
+  letter-spacing: 0.18em;
+}
+
+.translator-header h2 {
+  margin-top: 5px;
+  font-size: 34px;
+}
+
+.translator-header p {
+  margin: 5px 0 0;
+  color: #716e81;
+  font-size: 9px;
+}
+
+.translator-header > button {
+  width: 38px;
+  height: 38px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.04);
+  cursor: pointer;
+  font-size: 21px;
+}
+
+.translator-body {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  min-height: 520px;
+}
+
+.translator-input,
+.translator-output {
+  padding: 28px 30px;
+}
+
+.translator-input {
+  position: relative;
+  border-right: 1px solid var(--line);
+}
+
+.translator-language-row {
+  display: flex;
+  min-height: 35px;
+  gap: 12px;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 15px;
+}
+
+.translator-language-row strong {
+  padding: 6px 9px;
+  border: 1px solid rgba(121, 245, 211, 0.16);
+  border-radius: 999px;
+  background: rgba(121, 245, 211, 0.05);
+  color: #a5f8e3;
+  font-size: 9px;
+  font-weight: 600;
+}
+
+.translator-language-row label {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.translator-language-row select {
+  min-width: 145px;
+  padding: 9px 30px 9px 11px;
+  border: 1px solid rgba(121, 245, 211, 0.18);
+  border-radius: 10px;
+  outline: 0;
+  background: #121020;
+  color: #efedf6;
+  font-size: 10px;
+}
+
+.translator-input textarea {
+  width: 100%;
+  min-height: 365px;
+  padding: 17px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  outline: 0;
+  resize: vertical;
+  background: rgba(255, 255, 255, 0.028);
+  color: #f5f3fa;
+  font-family: inherit;
+  font-size: 16px;
+  line-height: 1.65;
+}
+
+.translator-input textarea:focus {
+  border-color: rgba(121, 245, 211, 0.4);
+  box-shadow: 0 0 0 3px rgba(121, 245, 211, 0.045);
+}
+
+.translator-count {
+  display: block;
+  margin-top: 8px;
+  color: #656274;
+  font-size: 8px;
+  text-align: right;
+}
+
+.translator-swap {
+  position: absolute;
+  z-index: 2;
+  top: 52%;
+  left: 50%;
+  display: grid;
+  width: 42px;
+  height: 42px;
+  border: 1px solid rgba(121, 245, 211, 0.28);
+  border-radius: 50%;
+  place-items: center;
+  background: #11101e;
+  color: #a5f8e3;
+  cursor: pointer;
+  font-size: 18px;
+  transform: translate(-50%, -50%);
+}
+
+.translator-swap:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+
+.translator-style {
+  display: flex;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.translator-style button {
+  padding: 7px 9px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: #777486;
+  cursor: pointer;
+  font-size: 8px;
+}
+
+.translator-style button.active {
+  background: rgba(121, 233, 255, 0.1);
+  color: #a7efff;
+}
+
+.translator-result {
+  min-height: 292px;
+  padding: 18px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: rgba(255, 255, 255, 0.025);
+}
+
+.translator-result > p {
+  margin: 0;
+  color: #6e6b7c;
+  font-size: 14px;
+  line-height: 1.65;
+  white-space: pre-wrap;
+}
+
+.translator-result.filled > p {
+  color: #f0eef6;
+  font-size: 17px;
+}
+
+.translator-result > div,
+.translator-result aside {
+  display: grid;
+  gap: 5px;
+  margin-top: 18px;
+  padding-top: 15px;
+  border-top: 1px solid var(--line);
+}
+
+.translator-result small,
+.translator-result aside strong {
+  color: #79e9ff;
+  font-size: 8px;
+  letter-spacing: 0.14em;
+}
+
+.translator-result span {
+  color: #9d9aaa;
+  font-size: 10px;
+  line-height: 1.55;
+}
+
+.translator-result aside strong {
+  color: #e3c68e;
+}
+
+.translator-actions {
+  display: grid;
+  grid-template-columns: auto auto 1fr;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.translator-actions button {
+  padding: 12px;
+  border: 1px solid rgba(121, 233, 255, 0.16);
+  border-radius: 11px;
+  background: rgba(121, 233, 255, 0.045);
+  color: #a7efff;
+  cursor: pointer;
+  font-size: 9px;
+}
+
+.translator-actions button:disabled {
+  cursor: default;
+  opacity: 0.4;
+}
+
+.translator-actions .translator-submit {
+  display: flex;
+  justify-content: space-between;
+  border: 0;
+  background: linear-gradient(110deg, #79f5d3, #79e9ff);
+  color: #080711;
+  font-weight: 750;
+}
+
+.translator-notice {
+  margin: 10px 0 0;
+  color: #d99b9b;
+  font-size: 9px;
+}
+
 .mail-backdrop {
   position: fixed;
   z-index: 118;
@@ -2482,6 +2755,69 @@ footer > span {
   .mail-backdrop {
     align-items: end;
     padding: 0;
+  }
+
+  .translator-backdrop {
+    align-items: end;
+    padding: 0;
+  }
+
+  .translator-studio {
+    width: 100%;
+    max-height: 94vh;
+    border-radius: 24px 24px 0 0;
+  }
+
+  .translator-header {
+    padding: 21px 18px;
+  }
+
+  .translator-header h2 {
+    font-size: 27px;
+  }
+
+  .translator-body {
+    display: block;
+  }
+
+  .translator-input,
+  .translator-output {
+    padding: 20px 18px;
+  }
+
+  .translator-input {
+    border-right: 0;
+    border-bottom: 1px solid var(--line);
+  }
+
+  .translator-input textarea {
+    min-height: 190px;
+  }
+
+  .translator-swap {
+    top: auto;
+    bottom: calc(50% - 21px);
+    transform: translate(-50%, 50%);
+  }
+
+  .translator-language-row {
+    align-items: flex-start;
+  }
+
+  .translator-language-row label {
+    display: grid;
+  }
+
+  .translator-result {
+    min-height: 190px;
+  }
+
+  .translator-actions {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .translator-actions .translator-submit {
+    grid-column: 1 / -1;
   }
 
   .mail-studio {
