@@ -4,6 +4,13 @@ import { FormEvent, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import type { AionMode } from "@/lib/aion-assistant";
 
+type YouTubeVideo = {
+  id: string;
+  title: string;
+  channel: string;
+  thumbnail: string;
+};
+
 type Message = {
   role: "user" | "assistant";
   content: string;
@@ -11,7 +18,7 @@ type Message = {
   sources?: { title: string; url: string }[];
   calendarAction?: CalendarAction;
   calendarConnectionRequired?: boolean;
-  musicUrl?: string;
+  youtubeVideo?: YouTubeVideo;
   browserUrl?: string;
 };
 
@@ -31,8 +38,145 @@ type AionChatProps = {
   onClose: () => void;
   onOpenDocuments: () => void;
   onOpenCalendar: () => void;
+  onMusicPlayingChange: (playing: boolean) => void;
   voiceMessages?: Message[];
 };
+
+type YouTubePlayer = {
+  destroy: () => void;
+  playVideo: () => void;
+};
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: new (
+        element: HTMLElement,
+        options: {
+          videoId: string;
+          playerVars: Record<string, string | number>;
+          events: {
+            onReady: (event: { target: YouTubePlayer }) => void;
+            onStateChange: (event: { data: number }) => void;
+            onError: () => void;
+          };
+        },
+      ) => YouTubePlayer;
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeApiPromise: Promise<void> | null = null;
+
+function loadYouTubePlayerApi() {
+  if (window.YT?.Player) return Promise.resolve();
+  if (youtubeApiPromise) return youtubeApiPromise;
+
+  youtubeApiPromise = new Promise<void>((resolve) => {
+    const existingCallback = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      existingCallback?.();
+      resolve();
+    };
+    if (!document.getElementById("youtube-iframe-api")) {
+      const script = document.createElement("script");
+      script.id = "youtube-iframe-api";
+      script.src = "https://www.youtube.com/iframe_api";
+      script.async = true;
+      document.head.appendChild(script);
+    }
+  });
+  return youtubeApiPromise;
+}
+
+function extractMusicQuery(text: string) {
+  return text
+    .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
+    .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
+    .replace(
+      /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?/i,
+      "",
+    )
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function YouTubeMusicPlayer({
+  video,
+  onPlayingChange,
+}: {
+  video: YouTubeVideo;
+  onPlayingChange: (playing: boolean) => void;
+}) {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YouTubePlayer | null>(null);
+  const [activated, setActivated] = useState(false);
+  const [playerError, setPlayerError] = useState(false);
+
+  useEffect(() => {
+    if (!activated || !mountRef.current) return;
+    let cancelled = false;
+
+    void loadYouTubePlayerApi().then(() => {
+      if (cancelled || !mountRef.current || !window.YT?.Player) return;
+      playerRef.current = new window.YT.Player(mountRef.current, {
+        videoId: video.id,
+        playerVars: {
+          autoplay: 1,
+          controls: 1,
+          playsinline: 1,
+          rel: 0,
+          origin: window.location.origin,
+        },
+        events: {
+          onReady: (event) => event.target.playVideo(),
+          onStateChange: (event) => onPlayingChange(event.data === 1),
+          onError: () => {
+            setPlayerError(true);
+            onPlayingChange(false);
+          },
+        },
+      });
+    });
+
+    return () => {
+      cancelled = true;
+      playerRef.current?.destroy();
+      playerRef.current = null;
+      onPlayingChange(false);
+    };
+  }, [activated, onPlayingChange, video.id]);
+
+  return (
+    <div className={`youtube-music-player ${activated ? "active" : ""}`}>
+      <div className="youtube-track-copy">
+        <span>♫</span>
+        <div>
+          <strong>{video.title}</strong>
+          <small>{video.channel}</small>
+        </div>
+      </div>
+      {!activated ? (
+        <button onClick={() => setActivated(true)}>
+          <span>▶</span>
+          Jetzt in AION abspielen
+        </button>
+      ) : (
+        <div className="youtube-player-frame" ref={mountRef} />
+      )}
+      {playerError && (
+        <a
+          href={`https://www.youtube.com/watch?v=${video.id}`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Titel direkt auf YouTube öffnen <span>↗</span>
+        </a>
+      )}
+    </div>
+  );
+}
 
 const modeNames: Record<AionMode, string> = {
   alltag: "Alltag",
@@ -70,6 +214,7 @@ export function AionChat({
   onClose,
   onOpenDocuments,
   onOpenCalendar,
+  onMusicPlayingChange,
   voiceMessages = [],
 }: AionChatProps) {
   const [messages, setMessages] = useState<Message[]>([]);
@@ -97,6 +242,10 @@ export function AionChat({
     });
   }, [messages, busy]);
 
+  useEffect(() => {
+    if (!open) onMusicPlayingChange(false);
+  }, [onMusicPlayingChange, open]);
+
   async function sendMessage(text: string) {
     const clean = text.trim();
     if (!clean || busy) return;
@@ -108,6 +257,47 @@ export function AionChat({
     setError(null);
 
     try {
+      const hasMusicIntent =
+        /\b(amazon|youtube)(?: music)?\b/i.test(clean) ||
+        /\bmusik\b.*\b(spiel|abspiel|hör)\w*/i.test(clean) ||
+        /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i.test(clean);
+      if (hasMusicIntent) {
+        const musicQuery = extractMusicQuery(clean);
+        if (!musicQuery) {
+          setMessages((current) => [
+            ...current,
+            {
+              role: "assistant",
+              content: "Gern – welchen Titel, Künstler oder welche Musikrichtung möchtest du hören?",
+            },
+          ]);
+          return;
+        }
+        const musicResponse = await fetch(
+          `/api/youtube/search?q=${encodeURIComponent(musicQuery)}`,
+          { cache: "no-store" },
+        );
+        const musicResult = (await musicResponse.json()) as {
+          video?: YouTubeVideo;
+          error?: string;
+        };
+        if (!musicResponse.ok || !musicResult.video) {
+          throw new Error(musicResult.error || "Ich konnte keinen passenden Titel finden.");
+        }
+        setMessages((current) => [
+          ...current,
+          {
+            role: "assistant",
+            content:
+              mode === "jung" || mode === "meditation"
+                ? `Gefunden: „${musicResult.video?.title}“. Tippe auf Abspielen, sobald du bereit bist.`
+                : `Gefunden: „${musicResult.video?.title}“. Einmal Abspielen antippen – den Rest erledigen Musik und meine fragwürdigen Tanzkünste.`,
+            youtubeVideo: musicResult.video,
+          },
+        ]);
+        return;
+      }
+
       const response = await fetch("/api/aion", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -294,15 +484,11 @@ export function AionChat({
                         Google Calendar verbinden <span>↗</span>
                       </button>
                     )}
-                    {message.musicUrl && (
-                      <a
-                        className="chat-music-link"
-                        href={message.musicUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                      >
-                        In Amazon Music öffnen <span>↗</span>
-                      </a>
+                    {message.youtubeVideo && (
+                      <YouTubeMusicPlayer
+                        video={message.youtubeVideo}
+                        onPlayingChange={onMusicPlayingChange}
+                      />
                     )}
                     {message.browserUrl && (
                       <a
