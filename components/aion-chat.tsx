@@ -12,6 +12,7 @@ type Message = {
   calendarAction?: CalendarAction;
   calendarConnectionRequired?: boolean;
   musicUrl?: string;
+  browserUrl?: string;
 };
 
 type CalendarAction = {
@@ -301,6 +302,16 @@ export function AionChat({
                         rel="noreferrer"
                       >
                         In Amazon Music öffnen <span>↗</span>
+                      </a>
+                    )}
+                    {message.browserUrl && (
+                      <a
+                        className="chat-browser-link"
+                        href={message.browserUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Im Browser öffnen <span>↗</span>
                       </a>
                     )}
                     {message.calendarAction && (
