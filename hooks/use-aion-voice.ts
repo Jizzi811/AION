@@ -525,6 +525,7 @@ export function useAionVoice(mode: AionMode) {
               .then(async (result) => {
                 const body = (await result.json()) as {
                   message?: string;
+                  speechMessage?: string;
                   error?: string;
                 };
                 if (!result.ok || !body.message) {
@@ -547,7 +548,7 @@ export function useAionVoice(mode: AionMode) {
                     text: answer,
                   },
                 ]);
-                const spokenAnswer = toSpeakableText(answer);
+                const spokenAnswer = toSpeakableText(body.speechMessage || answer);
                 if (spokenAnswer) {
                   vapi.say(spokenAnswer, false, true, false);
                 }
