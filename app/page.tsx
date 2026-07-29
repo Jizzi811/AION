@@ -66,6 +66,7 @@ export default function Home() {
     error,
     messages,
     start: toggleVoice,
+    speak,
     handoff,
     clearHandoff,
   } = useAionVoice(activeMode);
@@ -321,6 +322,9 @@ export default function Home() {
           setCalendarStudioOpen(true);
         }}
         onMusicPlayingChange={setMusicPlaying}
+        voiceState={voiceState}
+        onToggleVoice={toggleVoice}
+        onSpeak={speak}
         voiceMessages={messages.map((message) => ({
           role: message.role,
           content: message.text,
