@@ -96,7 +96,7 @@ function loadYouTubePlayerApi() {
 }
 
 function extractMusicQuery(text: string) {
-  return text
+  const query = text
     .replace(/^\s*aion[,.]?\s*/i, "")
     .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
     .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
@@ -116,6 +116,12 @@ function extractMusicQuery(text: string) {
     .replace(/[?.!]+\s*$/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  return /^(hören|listen|musik|music|etwas|was|song|lied|track|album|playlist|spielen|abspielen)$/i.test(
+    query,
+  )
+    ? ""
+    : query;
 }
 
 function hasMusicTextIntent(text: string) {
