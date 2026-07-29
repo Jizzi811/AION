@@ -60,6 +60,7 @@ export default function Home() {
   const [calendarStudioOpen, setCalendarStudioOpen] = useState(false);
   const [mailStudioOpen, setMailStudioOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
+  const [musicPlaying, setMusicPlaying] = useState(false);
   const {
     state: voiceState,
     error,
@@ -153,7 +154,15 @@ export default function Home() {
           </div>
         </motion.div>
 
-          <div className={`orb-stage ${voiceState}`}>
+          <div
+            className={`orb-stage ${voiceState} ${
+              musicPlaying
+                ? activeMode === "jung" || activeMode === "meditation"
+                  ? "music-flow"
+                  : "dancing"
+                : ""
+            }`}
+          >
           <div className="orbit orbit-a" />
           <div className="orbit orbit-b" />
           <div className="orb-glow" />
@@ -170,7 +179,11 @@ export default function Home() {
           </video>
           <div className="orb-status">
             <span className="status-dot" />
-            {voiceState === "connecting"
+            {musicPlaying
+              ? activeMode === "jung" || activeMode === "meditation"
+                ? "AION bewegt sich ruhig zur Musik"
+                : "AION tanzt – auf eigene Gefahr"
+              : voiceState === "connecting"
               ? "AION verbindet sich …"
               : voiceState === "listening"
                 ? "AION hört zu"
@@ -307,12 +320,13 @@ export default function Home() {
           setChatOpen(false);
           setCalendarStudioOpen(true);
         }}
+        onMusicPlayingChange={setMusicPlaying}
         voiceMessages={messages.map((message) => ({
           role: message.role,
           content: message.text,
           calendarAction: message.calendarAction,
           calendarConnectionRequired: message.calendarConnectionRequired,
-          musicUrl: message.musicUrl,
+          youtubeVideo: message.youtubeVideo,
           browserUrl: message.browserUrl,
         }))}
       />
