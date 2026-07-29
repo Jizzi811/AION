@@ -36,6 +36,11 @@ type VapiMessage = {
   transcriptType?: string;
 };
 
+type LiveVoiceMessage = {
+  role: "user" | "assistant";
+  content: string;
+};
+
 const calendarVoicePatterns = [
   /\bkalender\w*/i,
   /\b\w*termin\w*/i,
@@ -53,6 +58,19 @@ const mailVoicePatterns = [
   /\be-?mail\w*/i,
   /\bmail\w*\b/i,
 ];
+const liveVoicePatterns = [
+  /\bnews\b/i,
+  /\bnachrichten\b/i,
+  /\bschlagzeilen\b/i,
+  /\bwetter\b/i,
+  /\btemperatur\b/i,
+  /\bprognose\b/i,
+  /\bregnet\b/i,
+  /\bregen\b/i,
+  /\bsonnig\b/i,
+  /\bwindig\b/i,
+  /\bwas ist heute passiert\b/i,
+];
 const voiceYesPattern =
   /^\s*(ja|ja bitte|ja genau|ja mach das|bitte|genau|okay|ok|mach das|eintragen|bestätigt)\s*[.!]?\s*$/i;
 const voiceNoPattern =
@@ -62,6 +80,7 @@ export function useAionVoice(mode: AionMode) {
   const vapiRef = useRef<Vapi | null>(null);
   const modeRef = useRef(mode);
   const pendingCalendarActionRef = useRef<CalendarVoiceAction | null>(null);
+  const pendingLiveContextRef = useRef<LiveVoiceMessage[] | null>(null);
   const [state, setState] = useState<VoiceState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<TranscriptItem[]>([]);
@@ -76,6 +95,7 @@ export function useAionVoice(mode: AionMode) {
 
   const stop = useCallback(() => {
     pendingCalendarActionRef.current = null;
+    pendingLiveContextRef.current = null;
     vapiRef.current?.stop();
     setState("idle");
   }, []);
@@ -204,6 +224,9 @@ export function useAionVoice(mode: AionMode) {
           const hasMailIntent = mailVoicePatterns.some((pattern) =>
             pattern.test(transcript),
           );
+          const hasLiveIntent = liveVoicePatterns.some((pattern) =>
+            pattern.test(transcript),
+          );
 
           if (hasCalendarIntent) {
             void fetch("/api/aion", {
@@ -261,6 +284,74 @@ export function useAionVoice(mode: AionMode) {
                   requestError instanceof Error
                     ? requestError.message
                     : "Kalenderauftrag konnte nicht vorbereitet werden.",
+                  false,
+                  true,
+                  true,
+                );
+              })
+              .finally(() => setState("listening"));
+            return;
+          }
+
+          const pendingLiveContext = pendingLiveContextRef.current;
+          if (hasLiveIntent || pendingLiveContext) {
+            pendingLiveContextRef.current = null;
+            const liveMessages: LiveVoiceMessage[] = pendingLiveContext
+              ? [
+                  ...pendingLiveContext,
+                  {
+                    role: "user",
+                    content: `Aktuelle Live-Recherche fortsetzen. Antwort auf deine Rückfrage: ${transcript}`,
+                  },
+                ]
+              : [{ role: "user", content: transcript }];
+
+            vapi.say(
+              "Einen Moment, ich recherchiere das aktuell für dich.",
+              false,
+              true,
+              true,
+            );
+            void fetch("/api/aion", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                mode: modeRef.current,
+                messages: liveMessages,
+              }),
+            })
+              .then(async (result) => {
+                const body = (await result.json()) as {
+                  message?: string;
+                  error?: string;
+                };
+                if (!result.ok || !body.message) {
+                  throw new Error(
+                    body.error || "Die Live-Recherche ist fehlgeschlagen.",
+                  );
+                }
+                const answer = body.message.trim();
+                if (answer.endsWith("?")) {
+                  pendingLiveContextRef.current = [
+                    ...liveMessages,
+                    { role: "assistant", content: answer },
+                  ];
+                }
+                setMessages((current) => [
+                  ...current,
+                  {
+                    id: `${Date.now()}-${current.length}`,
+                    role: "assistant",
+                    text: answer,
+                  },
+                ]);
+                vapi.say(answer, false, true, true);
+              })
+              .catch((requestError) => {
+                vapi.say(
+                  requestError instanceof Error
+                    ? requestError.message
+                    : "Die Live-Recherche ist fehlgeschlagen.",
                   false,
                   true,
                   true,
