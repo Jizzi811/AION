@@ -46,55 +46,6 @@ type AionChatProps = {
   voiceMessages?: Message[];
 };
 
-type YouTubePlayer = {
-  destroy: () => void;
-  playVideo: () => void;
-  setVolume: (volume: number) => void;
-};
-
-declare global {
-  interface Window {
-    YT?: {
-      Player: new (
-        element: HTMLElement,
-        options: {
-          videoId: string;
-          playerVars: Record<string, string | number>;
-          events: {
-            onReady: (event: { target: YouTubePlayer }) => void;
-            onStateChange: (event: { data: number }) => void;
-            onError: () => void;
-          };
-        },
-      ) => YouTubePlayer;
-    };
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
-
-let youtubeApiPromise: Promise<void> | null = null;
-
-function loadYouTubePlayerApi() {
-  if (window.YT?.Player) return Promise.resolve();
-  if (youtubeApiPromise) return youtubeApiPromise;
-
-  youtubeApiPromise = new Promise<void>((resolve) => {
-    const existingCallback = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      existingCallback?.();
-      resolve();
-    };
-    if (!document.getElementById("youtube-iframe-api")) {
-      const script = document.createElement("script");
-      script.id = "youtube-iframe-api";
-      script.src = "https://www.youtube.com/iframe_api";
-      script.async = true;
-      document.head.appendChild(script);
-    }
-  });
-  return youtubeApiPromise;
-}
-
 function extractMusicQuery(text: string) {
   const query = text
     .replace(/^\s*aion[,.]?\s*/i, "")
@@ -146,63 +97,17 @@ function hasMusicTextIntent(text: string) {
 function YouTubeMusicPlayer({
   video,
   onPlayingChange,
-  voiceState,
 }: {
   video: YouTubeVideo;
   onPlayingChange: (playing: boolean) => void;
-  voiceState: VoiceState;
 }) {
-  const mountRef = useRef<HTMLDivElement>(null);
-  const playerRef = useRef<YouTubePlayer | null>(null);
-  const [playerReady, setPlayerReady] = useState(false);
   const [started, setStarted] = useState(false);
-  const [playerError, setPlayerError] = useState(false);
 
   useEffect(() => {
-    if (!mountRef.current) return;
-    let cancelled = false;
-
-    void loadYouTubePlayerApi().then(() => {
-      if (cancelled || !mountRef.current || !window.YT?.Player) return;
-      playerRef.current = new window.YT.Player(mountRef.current, {
-        videoId: video.id,
-        playerVars: {
-          autoplay: 0,
-          controls: 1,
-          playsinline: 1,
-          rel: 0,
-          origin: window.location.origin,
-        },
-        events: {
-          onReady: (event) => {
-            event.target.setVolume(voiceState === "speaking" ? 18 : 72);
-            setPlayerReady(true);
-          },
-          onStateChange: (event) => {
-            const playing = event.data === 1;
-            if (playing) setStarted(true);
-            onPlayingChange(playing);
-          },
-          onError: () => {
-            setPlayerError(true);
-            onPlayingChange(false);
-          },
-        },
-      });
-    });
-
     return () => {
-      cancelled = true;
-      playerRef.current?.destroy();
-      playerRef.current = null;
       onPlayingChange(false);
     };
-  }, [onPlayingChange, video.id]);
-
-  useEffect(() => {
-    if (!playerRef.current) return;
-    playerRef.current.setVolume(voiceState === "speaking" ? 18 : 72);
-  }, [voiceState]);
+  }, [onPlayingChange]);
 
   return (
     <div className={`youtube-music-player ${started ? "active" : ""}`}>
@@ -214,27 +119,37 @@ function YouTubeMusicPlayer({
         </div>
       </div>
       <div className="youtube-player-shell">
-        <div className="youtube-player-frame" ref={mountRef} />
-        {!started && (
+        {started ? (
+          <div className="youtube-player-frame">
+            <iframe
+              src={`https://www.youtube-nocookie.com/embed/${video.id}?autoplay=1&playsinline=1&rel=0`}
+              title={`${video.title} – YouTube-Player`}
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+            />
+          </div>
+        ) : (
           <button
             className="youtube-play-overlay"
-            disabled={!playerReady}
-            onClick={() => playerRef.current?.playVideo()}
+            onClick={() => {
+              setStarted(true);
+              onPlayingChange(true);
+            }}
           >
+            <img src={video.thumbnail} alt="" />
             <span>▶</span>
-            {playerReady ? "Jetzt in AION abspielen" : "Player wird geladen …"}
+            Jetzt in AION abspielen
           </button>
         )}
       </div>
-      {playerError && (
-        <a
-          href={`https://www.youtube.com/watch?v=${video.id}`}
-          target="_blank"
-          rel="noreferrer"
-        >
-          Titel direkt auf YouTube öffnen <span>↗</span>
-        </a>
-      )}
+      <a
+        href={`https://www.youtube.com/watch?v=${video.id}`}
+        target="_blank"
+        rel="noreferrer"
+      >
+        Falls der Player blockiert wird: auf YouTube öffnen <span>↗</span>
+      </a>
     </div>
   );
 }
@@ -570,7 +485,6 @@ export function AionChat({
                       <YouTubeMusicPlayer
                         video={message.youtubeVideo}
                         onPlayingChange={onMusicPlayingChange}
-                        voiceState={voiceState}
                       />
                     )}
                     {message.browserUrl && (
