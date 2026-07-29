@@ -27,6 +27,7 @@ export type TranscriptItem = {
   text: string;
   calendarAction?: CalendarVoiceAction;
   calendarConnectionRequired?: boolean;
+  musicUrl?: string;
 };
 
 type VapiMessage = {
@@ -70,6 +71,11 @@ const liveVoicePatterns = [
   /\bsonnig\b/i,
   /\bwindig\b/i,
   /\bwas ist heute passiert\b/i,
+];
+const musicVoicePatterns = [
+  /\bamazon music\b/i,
+  /\bmusik\b.*\b(spiel|abspiel|hör|amazon)\w*/i,
+  /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i,
 ];
 const voiceYesPattern =
   /^\s*(ja|ja bitte|ja genau|ja mach das|bitte|genau|okay|ok|mach das|eintragen|bestätigt)\s*[.!]?\s*$/i;
@@ -227,6 +233,9 @@ export function useAionVoice(mode: AionMode) {
           const hasLiveIntent = liveVoicePatterns.some((pattern) =>
             pattern.test(transcript),
           );
+          const hasMusicIntent = musicVoicePatterns.some((pattern) =>
+            pattern.test(transcript),
+          );
 
           if (hasCalendarIntent) {
             void fetch("/api/aion", {
@@ -290,6 +299,36 @@ export function useAionVoice(mode: AionMode) {
                 );
               })
               .finally(() => setState("listening"));
+            return;
+          }
+
+          if (hasMusicIntent) {
+            const musicQuery = transcript
+              .replace(/\b(auf|bei|über|in)\s+amazon music\b/gi, "")
+              .replace(/\bamazon music\b/gi, "")
+              .replace(
+                /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?/i,
+                "",
+              )
+              .replace(/\s+/g, " ")
+              .trim();
+            const musicUrl = musicQuery
+              ? `https://music.amazon.de/search/${encodeURIComponent(musicQuery)}`
+              : "https://music.amazon.de";
+            vapi.stop();
+            setMessages((current) => [
+              ...current,
+              {
+                id: `${Date.now()}-${current.length}`,
+                role: "assistant",
+                text: musicQuery
+                  ? `Ich habe „${musicQuery}“ für Amazon Music vorbereitet. Tippe im Chat auf „In Amazon Music öffnen“.`
+                  : "Ich habe Amazon Music für dich vorbereitet. Tippe im Chat auf „In Amazon Music öffnen“.",
+                musicUrl,
+              },
+            ]);
+            setHandoff({ id: Date.now(), target: "chat" });
+            setState("idle");
             return;
           }
 
