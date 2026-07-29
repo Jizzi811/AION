@@ -1115,7 +1115,11 @@ footer > span {
   margin-left: 5px;
 }
 
-.chat-calendar-connect {
+.chat-calendar-connect,
+.chat-music-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
   margin-top: 10px;
   padding: 9px 12px;
   border: 1px solid rgba(var(--accent-rgb), 0.25);
@@ -1124,6 +1128,7 @@ footer > span {
   color: var(--accent);
   cursor: pointer;
   font-size: 9px;
+  text-decoration: none;
 }
 
 .chat-calendar-action {
