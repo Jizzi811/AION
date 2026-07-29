@@ -11,19 +11,21 @@ export type VoiceState =
   | "thinking"
   | "speaking";
 
+type CalendarVoiceAction = {
+  kind: "create" | "update" | "delete";
+  eventId: string;
+  title: string;
+  start: string;
+  end: string;
+  location: string;
+  summary: string;
+};
+
 export type TranscriptItem = {
   id: string;
   role: "user" | "assistant";
   text: string;
-  calendarAction?: {
-    kind: "create" | "update" | "delete";
-    eventId: string;
-    title: string;
-    start: string;
-    end: string;
-    location: string;
-    summary: string;
-  };
+  calendarAction?: CalendarVoiceAction;
   calendarConnectionRequired?: boolean;
 };
 
@@ -51,10 +53,15 @@ const mailVoicePatterns = [
   /\be-?mail\w*/i,
   /\bmail\w*\b/i,
 ];
+const voiceYesPattern =
+  /^\s*(ja|ja bitte|bitte|genau|okay|ok|mach das|eintragen|bestätigt)\s*[.!]?\s*$/i;
+const voiceNoPattern =
+  /^\s*(nein|abbrechen|stopp|stop|doch nicht|nicht eintragen)\s*[.!]?\s*$/i;
 
 export function useAionVoice(mode: AionMode) {
   const vapiRef = useRef<Vapi | null>(null);
   const modeRef = useRef(mode);
+  const pendingCalendarActionRef = useRef<CalendarVoiceAction | null>(null);
   const [state, setState] = useState<VoiceState>("idle");
   const [error, setError] = useState<string | null>(null);
   const [messages, setMessages] = useState<TranscriptItem[]>([]);
@@ -68,6 +75,7 @@ export function useAionVoice(mode: AionMode) {
   }, [mode]);
 
   const stop = useCallback(() => {
+    pendingCalendarActionRef.current = null;
     vapiRef.current?.stop();
     setState("idle");
   }, []);
@@ -116,6 +124,80 @@ export function useAionVoice(mode: AionMode) {
           setState("thinking");
 
           const transcript = message.transcript as string;
+          const pendingAction = pendingCalendarActionRef.current;
+
+          if (pendingAction) {
+            if (voiceNoPattern.test(transcript)) {
+              pendingCalendarActionRef.current = null;
+              vapi.say(
+                "Alles klar, ich habe den Kalenderauftrag verworfen.",
+                false,
+                true,
+                true,
+              );
+              setState("listening");
+              return;
+            }
+            if (!voiceYesPattern.test(transcript)) {
+              vapi.say(
+                "Bitte sag eindeutig Ja zum Ausführen oder Nein zum Abbrechen.",
+                false,
+                true,
+                true,
+              );
+              setState("listening");
+              return;
+            }
+
+            pendingCalendarActionRef.current = null;
+            const method =
+              pendingAction.kind === "create"
+                ? "POST"
+                : pendingAction.kind === "update"
+                  ? "PATCH"
+                  : "DELETE";
+            void fetch("/api/calendar", {
+              method,
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                id: pendingAction.eventId,
+                title: pendingAction.title,
+                start: pendingAction.start,
+                end: pendingAction.end,
+                location: pendingAction.location,
+                confirmed: true,
+              }),
+            })
+              .then(async (result) => {
+                const body = (await result.json()) as { error?: string };
+                if (!result.ok) {
+                  throw new Error(body.error || "Der Kalenderauftrag ist fehlgeschlagen.");
+                }
+                vapi.say(
+                  pendingAction.kind === "create"
+                    ? "Erledigt. Der Termin steht jetzt in deinem Kalender."
+                    : pendingAction.kind === "update"
+                      ? "Erledigt. Ich habe den Termin geändert."
+                      : "Erledigt. Der Termin wurde gelöscht.",
+                  false,
+                  true,
+                  true,
+                );
+              })
+              .catch((requestError) => {
+                vapi.say(
+                  requestError instanceof Error
+                    ? requestError.message
+                    : "Der Kalenderauftrag ist fehlgeschlagen.",
+                  false,
+                  true,
+                  true,
+                );
+              })
+              .finally(() => setState("listening"));
+            return;
+          }
+
           const hasCalendarIntent = calendarVoicePatterns.some((pattern) =>
             pattern.test(transcript),
           );
@@ -124,7 +206,6 @@ export function useAionVoice(mode: AionMode) {
           );
 
           if (hasCalendarIntent) {
-            vapi.stop();
             void fetch("/api/aion", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -143,33 +224,49 @@ export function useAionVoice(mode: AionMode) {
                 if (!result.ok || !body.message) {
                   throw new Error(body.error || "Kalenderauftrag konnte nicht vorbereitet werden.");
                 }
-                setMessages((current) => [
-                  ...current,
-                  {
-                    id: `${Date.now()}-${current.length}`,
-                    role: "assistant",
-                    text: body.message as string,
-                    calendarAction: body.calendarAction,
-                    calendarConnectionRequired: body.calendarConnectionRequired,
-                  },
-                ]);
-                setHandoff({ id: Date.now(), target: "chat" });
+                if (body.calendarConnectionRequired) {
+                  vapi.say(
+                    "Google Calendar muss zuerst verbunden werden. Ich öffne dir dafür die passende Ansicht.",
+                    false,
+                    true,
+                    true,
+                  );
+                  setMessages((current) => [
+                    ...current,
+                    {
+                      id: `${Date.now()}-${current.length}`,
+                      role: "assistant",
+                      text: body.message as string,
+                      calendarConnectionRequired: true,
+                    },
+                  ]);
+                  setHandoff({ id: Date.now(), target: "chat" });
+                  return;
+                }
+                if (!body.calendarAction) {
+                  vapi.say(body.message as string, false, true, true);
+                  return;
+                }
+
+                pendingCalendarActionRef.current = body.calendarAction;
+                vapi.say(
+                  `${body.calendarAction.summary} Soll ich das jetzt verbindlich ausführen? Bitte antworte mit Ja oder Nein.`,
+                  false,
+                  true,
+                  true,
+                );
               })
               .catch((requestError) => {
-                setMessages((current) => [
-                  ...current,
-                  {
-                    id: `${Date.now()}-${current.length}`,
-                    role: "assistant",
-                    text:
-                      requestError instanceof Error
-                        ? requestError.message
-                        : "Kalenderauftrag konnte nicht vorbereitet werden.",
-                  },
-                ]);
-                setHandoff({ id: Date.now(), target: "chat" });
+                vapi.say(
+                  requestError instanceof Error
+                    ? requestError.message
+                    : "Kalenderauftrag konnte nicht vorbereitet werden.",
+                  false,
+                  true,
+                  true,
+                );
               })
-              .finally(() => setState("idle"));
+              .finally(() => setState("listening"));
             return;
           }
 
