@@ -383,8 +383,8 @@ export function useAionVoice(mode: AionMode) {
                     role: "assistant",
                     text:
                       modeRef.current === "jung" || modeRef.current === "meditation"
-                        ? `Gefunden: „${body.video?.title}“. Tippe auf Abspielen, sobald du bereit bist.`
-                        : `Gefunden: „${body.video?.title}“. Tippe auf Abspielen – ich übernehme den Tanzteil.`,
+                        ? `Gefunden: „${body.video?.title}“. Tippe im Player auf Abspielen, sobald du bereit bist.`
+                        : `Gefunden: „${body.video?.title}“. Tippe im Player einmal auf Abspielen – ich übernehme den Tanzteil.`,
                     youtubeVideo: body.video,
                   },
                 ]);
