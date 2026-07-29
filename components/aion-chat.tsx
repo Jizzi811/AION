@@ -97,17 +97,44 @@ function loadYouTubePlayerApi() {
 
 function extractMusicQuery(text: string) {
   return text
+    .replace(/^\s*aion[,.]?\s*/i, "")
     .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
     .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
     .replace(
-      /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
+      /^\s*(kannst|könntest|würdest)\s+du\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
       "",
     )
+    .replace(
+      /^\s*(spiel|spiele|starte|öffne|suche|finde|hör|höre|play|put on|listen to)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
+      "",
+    )
+    .replace(/^\s*(mach|leg|lege)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i, "")
     .replace(/^\s*ich\s+(möchte|will)\s+(gern(?:e)?\s+)?/i, "")
-    .replace(/^\s*mach\s+/i, "")
-    .replace(/\s+(hören|an)\s*[.!]?\s*$/i, "")
+    .replace(/^\s*(etwas|was|musik|einen song|ein lied)\s+(von|mit)\s+/i, "")
+    .replace(/\s+(spielen|abspielen|anmachen|hören|auflegen|an|auf)\s*[?.!]?\s*$/i, "")
+    .replace(/\s+(für mich|bitte)\s*[?.!]?\s*$/i, "")
+    .replace(/[?.!]+\s*$/g, "")
     .replace(/\s+/g, " ")
     .trim();
+}
+
+function hasMusicTextIntent(text: string) {
+  const asksForInnerAudio =
+    /\b(meditation|körperreise|traumreise|atemübung|jung[- ]?modus)\b/i.test(text);
+  const explicitlyAsksForMusic =
+    /\b(musik|song|lied|playlist|album|track|youtube|amazon music)\b/i.test(text);
+  if (asksForInnerAudio && !explicitlyAsksForMusic) return false;
+
+  return [
+    /\b(amazon|youtube)(?: music)?\b/i,
+    /\bmusik\b.*\b(spiel|abspiel|hör)\w*/i,
+    /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i,
+    /\b(spiel|spiele|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?[\p{L}\p{N}]/iu,
+    /\b(kannst|könntest|würdest)\s+du\b.+\b(spielen|abspielen|anmachen|auflegen)\b/i,
+    /\b(mach|starte|leg|lege)\b.+\b(an|auf)\b/i,
+    /\bich\s+(möchte|will)\b.+\bhören\b/i,
+    /\b(play|listen to|put on)\b.+/i,
+  ].some((pattern) => pattern.test(text));
 }
 
 function YouTubeMusicPlayer({
@@ -288,13 +315,7 @@ export function AionChat({
     setError(null);
 
     try {
-      const hasMusicIntent =
-        /\b(amazon|youtube)(?: music)?\b/i.test(clean) ||
-        /\bmusik\b.*\b(spiel|abspiel|hör)\w*/i.test(clean) ||
-        /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i.test(clean) ||
-        /\b(spiel|spiele|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?(?!eine?\s+(meditation|körperreise|traumreise))[\p{L}\p{N}]/iu.test(clean) ||
-        /\bich\s+(möchte|will)\b.+\bhören\b/i.test(clean) ||
-        /\bmach\b.+\b(musik|song|lied|von)\b.+\ban\b/i.test(clean);
+      const hasMusicIntent = hasMusicTextIntent(clean);
       if (hasMusicIntent) {
         const musicQuery = extractMusicQuery(clean);
         if (!musicQuery) {
