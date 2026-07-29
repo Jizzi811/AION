@@ -103,7 +103,7 @@ function hasMusicIntent(text: string) {
 }
 
 function extractMusicQuery(text: string) {
-  return text
+  const query = text
     .replace(/^\s*aion[,.]?\s*/i, "")
     .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
     .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
@@ -123,6 +123,12 @@ function extractMusicQuery(text: string) {
     .replace(/[?.!]+\s*$/g, "")
     .replace(/\s+/g, " ")
     .trim();
+
+  return /^(hören|listen|musik|music|etwas|was|song|lied|track|album|playlist|spielen|abspielen)$/i.test(
+    query,
+  )
+    ? ""
+    : query;
 }
 const browserVoicePatterns = [
   /\böffne\b.*\b(browser|webseite|website|internetseite)\b/i,
@@ -384,6 +390,15 @@ export function useAionVoice(mode: AionMode) {
               true,
             );
             if (!musicQuery) {
+              setMessages((current) => [
+                ...current,
+                {
+                  id: `${Date.now()}-${current.length}`,
+                  role: "assistant",
+                  text: "Gern – welchen Titel, Künstler oder welche Musikrichtung möchtest du hören?",
+                },
+              ]);
+              setHandoff({ id: Date.now(), target: "chat" });
               setState("listening");
               return;
             }
