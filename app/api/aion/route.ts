@@ -12,6 +12,7 @@ type ChatMessage = {
 type AionRequest = {
   mode?: AionMode;
   messages?: ChatMessage[];
+  voice?: boolean;
   document?: {
     title?: string;
     content?: string;
@@ -291,6 +292,13 @@ export async function POST(request: Request) {
     }
 
     const documentContent = body.document?.content?.trim().slice(0, maxDocumentLength);
+    const voiceInstructions = body.voice
+      ? `\n\nSPRACHAUSGABE
+Formuliere die Antwort als gut verständlichen Sprechtext in höchstens fünf kurzen Sätzen.
+Verwende reinen Fließtext ohne Markdown, Tabellen, Aufzählungszeichen, Links, Quellenlisten oder Klammer-Zitate.
+Schreibe Einheiten sprechbar aus, zum Beispiel Grad Celsius, Prozent und Kilometer pro Stunde.
+Beginne direkt mit der Antwort und wiederhole weder die Frage noch die Ankündigung der Recherche.`
+      : "";
     const lastQuestion = messages[messages.length - 1].content;
     const hasCalendarIntent =
       !documentContent && calendarPatterns.some((pattern) => pattern.test(lastQuestion));
@@ -376,11 +384,11 @@ Führe niemals selbst eine Kalenderaktion aus. Das Werkzeug erzeugt nur eine Vor
     const response = await client.responses.create({
       model: process.env.OPENAI_MODEL || "gpt-5.6",
       reasoning: { effort: mode === "wissen" ? "medium" : "low" },
-      instructions: `${buildAionTextInstructions(mode)}${documentContext}${calendarContext}`,
+      instructions: `${buildAionTextInstructions(mode)}${voiceInstructions}${documentContext}${calendarContext}`,
       input: messages,
       tools: tools.length ? tools : undefined,
       include: useLiveSearch ? ["web_search_call.action.sources"] : undefined,
-      max_output_tokens: 2_500,
+      max_output_tokens: body.voice ? 700 : 2_500,
     });
 
     const calendarAction = calendarEvents
