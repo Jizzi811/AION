@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 import { AionChat } from "@/components/aion-chat";
 import { CalendarStudio } from "@/components/calendar-studio";
@@ -60,9 +60,25 @@ export default function Home() {
   const [calendarStudioOpen, setCalendarStudioOpen] = useState(false);
   const [mailStudioOpen, setMailStudioOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
-  const { state: voiceState, error, messages, start: toggleVoice } =
-    useAionVoice(activeMode);
+  const {
+    state: voiceState,
+    error,
+    messages,
+    start: toggleVoice,
+    handoff,
+    clearHandoff,
+  } = useAionVoice(activeMode);
   const active = modes[activeMode];
+
+  useEffect(() => {
+    if (!handoff) return;
+    if (handoff.target === "mail") {
+      setMailStudioOpen(true);
+    } else {
+      setChatOpen(true);
+    }
+    clearHandoff();
+  }, [handoff, clearHandoff]);
 
   return (
     <main className={`site-shell mode-${active.accent}`}>
@@ -294,6 +310,8 @@ export default function Home() {
         voiceMessages={messages.map((message) => ({
           role: message.role,
           content: message.text,
+          calendarAction: message.calendarAction,
+          calendarConnectionRequired: message.calendarConnectionRequired,
         }))}
       />
       <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
