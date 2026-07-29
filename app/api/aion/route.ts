@@ -184,8 +184,46 @@ function cleanMessages(messages: unknown): ChatMessage[] {
 
 function extractSources(response: { output: unknown[] }): Source[] {
   const sources = new Map<string, Source>();
+  const addSource = (url: string, title?: string) => {
+    try {
+      sources.set(url, {
+        title: title?.trim() || new URL(url).hostname,
+        url,
+      });
+    } catch {
+      // Ignore malformed tool output instead of exposing an unsafe link.
+    }
+  };
 
   for (const item of response.output) {
+    if (
+      item &&
+      typeof item === "object" &&
+      "type" in item &&
+      item.type === "web_search_call" &&
+      "action" in item &&
+      item.action &&
+      typeof item.action === "object" &&
+      "sources" in item.action &&
+      Array.isArray(item.action.sources)
+    ) {
+      for (const source of item.action.sources) {
+        if (
+          source &&
+          typeof source === "object" &&
+          "url" in source &&
+          typeof source.url === "string"
+        ) {
+          addSource(
+            source.url,
+            "title" in source && typeof source.title === "string"
+              ? source.title
+              : undefined,
+          );
+        }
+      }
+    }
+
     if (!item || typeof item !== "object" || !("type" in item) || item.type !== "message") {
       continue;
     }
@@ -201,14 +239,32 @@ function extractSources(response: { output: unknown[] }): Source[] {
           typeof annotation === "object" &&
           "type" in annotation &&
           annotation.type === "url_citation" &&
-          "url" in annotation &&
-          typeof annotation.url === "string"
+          (("url" in annotation && typeof annotation.url === "string") ||
+            ("url_citation" in annotation &&
+              annotation.url_citation &&
+              typeof annotation.url_citation === "object" &&
+              "url" in annotation.url_citation &&
+              typeof annotation.url_citation.url === "string"))
         ) {
+          const nested =
+            "url_citation" in annotation &&
+            annotation.url_citation &&
+            typeof annotation.url_citation === "object"
+              ? annotation.url_citation
+              : undefined;
+          const url =
+            "url" in annotation && typeof annotation.url === "string"
+              ? annotation.url
+              : nested && "url" in nested && typeof nested.url === "string"
+                ? nested.url
+                : "";
           const title =
             "title" in annotation && typeof annotation.title === "string"
               ? annotation.title
-              : new URL(annotation.url).hostname;
-          sources.set(annotation.url, { title, url: annotation.url });
+              : nested && "title" in nested && typeof nested.title === "string"
+                ? nested.title
+                : undefined;
+          if (url) addSource(url, title);
         }
       }
     }
@@ -323,6 +379,7 @@ Führe niemals selbst eine Kalenderaktion aus. Das Werkzeug erzeugt nur eine Vor
       instructions: `${buildAionTextInstructions(mode)}${documentContext}${calendarContext}`,
       input: messages,
       tools: tools.length ? tools : undefined,
+      include: useLiveSearch ? ["web_search_call.action.sources"] : undefined,
       max_output_tokens: 2_500,
     });
 
