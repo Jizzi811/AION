@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useEffect, useState } from "react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "motion/react";
 
 type TranslatorStudioProps = {
@@ -39,23 +39,58 @@ const languages = [
 
 export function TranslatorStudio({ open, onClose }: TranslatorStudioProps) {
   const [text, setText] = useState("");
-  const [targetLanguage, setTargetLanguage] = useState("en");
+  const [targetLanguage, setTargetLanguage] = useState("de");
   const [style, setStyle] = useState<"natural" | "polite">("natural");
   const [result, setResult] = useState<TranslationResult | null>(null);
   const [busy, setBusy] = useState(false);
+  const [recordingState, setRecordingState] = useState<
+    "idle" | "listening" | "processing"
+  >("idle");
+  const [heardSpeech, setHeardSpeech] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const animationFrameRef = useRef<number | null>(null);
+  const recordingStartedAtRef = useRef(0);
+  const lastSpeechAtRef = useRef(0);
+  const speechDetectedRef = useRef(false);
+
+  const releaseMicrophone = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+    mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+    mediaStreamRef.current = null;
+    void audioContextRef.current?.close();
+    audioContextRef.current = null;
+  }, []);
 
   useEffect(() => {
     if (!open) {
       window.speechSynthesis?.cancel();
+      const recorder = mediaRecorderRef.current;
+      recorder?.state === "recording" && recorder.stop();
+      releaseMicrophone();
+      setRecordingState("idle");
+      setHeardSpeech(false);
       setCopied(false);
     }
-  }, [open]);
+  }, [open, releaseMicrophone]);
 
-  async function translate(event?: FormEvent) {
-    event?.preventDefault();
-    if (!text.trim() || busy) return;
+  useEffect(
+    () => () => {
+      const recorder = mediaRecorderRef.current;
+      recorder?.state === "recording" && recorder.stop();
+      releaseMicrophone();
+    },
+    [releaseMicrophone],
+  );
+
+  const translateText = useCallback(async (sourceText: string) => {
+    if (!sourceText.trim()) return;
     setBusy(true);
     setNotice(null);
     setCopied(false);
@@ -63,7 +98,7 @@ export function TranslatorStudio({ open, onClose }: TranslatorStudioProps) {
       const response = await fetch("/api/translate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text, targetLanguage, style }),
+        body: JSON.stringify({ text: sourceText, targetLanguage, style }),
       });
       const translated = (await response.json()) as TranslationResult & { error?: string };
       if (!response.ok || !translated.translation) {
@@ -74,6 +109,154 @@ export function TranslatorStudio({ open, onClose }: TranslatorStudioProps) {
       setNotice(error instanceof Error ? error.message : "Die Übersetzung ist fehlgeschlagen.");
     } finally {
       setBusy(false);
+    }
+  }, [style, targetLanguage]);
+
+  async function translate(event?: FormEvent) {
+    event?.preventDefault();
+    if (!text.trim() || busy) return;
+    await translateText(text);
+  }
+
+  function stopListening() {
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") recorder.stop();
+  }
+
+  async function startListening() {
+    if (recordingState !== "idle" || busy) return;
+    if (!navigator.mediaDevices?.getUserMedia || !("MediaRecorder" in window)) {
+      setNotice("Die Live-Übersetzung wird von diesem Browser nicht unterstützt.");
+      return;
+    }
+
+    setNotice(null);
+    setResult(null);
+    setHeardSpeech(false);
+    speechDetectedRef.current = false;
+
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      mediaStreamRef.current = stream;
+
+      const supportedType = [
+        "audio/webm;codecs=opus",
+        "audio/mp4",
+        "audio/webm",
+      ].find((type) => MediaRecorder.isTypeSupported(type));
+      const recorder = new MediaRecorder(
+        stream,
+        supportedType ? { mimeType: supportedType } : undefined,
+      );
+      const chunks: BlobPart[] = [];
+      mediaRecorderRef.current = recorder;
+      recordingStartedAtRef.current = Date.now();
+      lastSpeechAtRef.current = Date.now();
+
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size > 0) chunks.push(event.data);
+      });
+      recorder.addEventListener("stop", () => {
+        const speechWasDetected = speechDetectedRef.current;
+        const mimeType = recorder.mimeType || "audio/webm";
+        releaseMicrophone();
+        mediaRecorderRef.current = null;
+
+        if (!speechWasDetected || chunks.length === 0) {
+          setRecordingState("idle");
+          setNotice("Ich habe keine deutliche Sprache gehört. Versuch es bitte noch einmal.");
+          return;
+        }
+
+        setRecordingState("processing");
+        const audio = new Blob(chunks, { type: mimeType });
+        const extension = mimeType.includes("mp4") ? "m4a" : "webm";
+        const formData = new FormData();
+        formData.append("audio", audio, `aion-live.${extension}`);
+
+        void fetch("/api/translate/audio", {
+          method: "POST",
+          body: formData,
+        })
+          .then(async (response) => {
+            const body = (await response.json()) as { text?: string; error?: string };
+            if (!response.ok || !body.text) {
+              throw new Error(body.error || "Die Sprache konnte nicht erkannt werden.");
+            }
+            setText(body.text);
+            await translateText(body.text);
+          })
+          .catch((error) => {
+            setNotice(
+              error instanceof Error
+                ? error.message
+                : "Die Sprache konnte nicht erkannt werden.",
+            );
+          })
+          .finally(() => setRecordingState("idle"));
+      });
+
+      const AudioContextConstructor =
+        window.AudioContext ||
+        (window as typeof window & { webkitAudioContext?: typeof AudioContext })
+          .webkitAudioContext;
+      if (AudioContextConstructor) {
+        const audioContext = new AudioContextConstructor();
+        audioContextRef.current = audioContext;
+        const source = audioContext.createMediaStreamSource(stream);
+        const analyser = audioContext.createAnalyser();
+        analyser.fftSize = 512;
+        source.connect(analyser);
+        const samples = new Uint8Array(analyser.fftSize);
+
+        const watchVolume = () => {
+          if (recorder.state !== "recording") return;
+          analyser.getByteTimeDomainData(samples);
+          let energy = 0;
+          for (const sample of samples) {
+            const normalized = (sample - 128) / 128;
+            energy += normalized * normalized;
+          }
+          const rms = Math.sqrt(energy / samples.length);
+          const now = Date.now();
+
+          if (rms > 0.035) {
+            speechDetectedRef.current = true;
+            setHeardSpeech(true);
+            lastSpeechAtRef.current = now;
+          }
+
+          const recordingDuration = now - recordingStartedAtRef.current;
+          const silenceDuration = now - lastSpeechAtRef.current;
+          if (
+            (speechDetectedRef.current && recordingDuration > 1_000 && silenceDuration > 1_500) ||
+            recordingDuration > 30_000 ||
+            (!speechDetectedRef.current && recordingDuration > 10_000)
+          ) {
+            recorder.stop();
+            return;
+          }
+          animationFrameRef.current = window.requestAnimationFrame(watchVolume);
+        };
+        animationFrameRef.current = window.requestAnimationFrame(watchVolume);
+      }
+
+      recorder.start(250);
+      setRecordingState("listening");
+    } catch (error) {
+      releaseMicrophone();
+      setRecordingState("idle");
+      setNotice(
+        error instanceof DOMException && error.name === "NotAllowedError"
+          ? "Bitte erlaube AION den Mikrofonzugriff in deinem Browser."
+          : "Das Mikrofon konnte nicht gestartet werden.",
+      );
     }
   }
 
@@ -144,10 +327,43 @@ export function TranslatorStudio({ open, onClose }: TranslatorStudioProps) {
                   <span>SPRACHE AUTOMATISCH ERKENNEN</span>
                   {result && <strong>{result.detectedLanguage}</strong>}
                 </div>
+                <div className={`translator-live ${recordingState}`}>
+                  <div>
+                    <strong>
+                      {recordingState === "listening"
+                        ? heardSpeech
+                          ? "Sprache erkannt"
+                          : "AION hört zu …"
+                        : recordingState === "processing"
+                          ? "AION erkennt und übersetzt …"
+                          : "Live aus der Umgebung"}
+                    </strong>
+                    <span>
+                      {recordingState === "listening"
+                        ? "Sprich in normaler Lautstärke. Nach einer Pause stoppt AION automatisch."
+                        : "Zielsprache wählen, Mikrofon starten und das Gegenüber sprechen lassen."}
+                    </span>
+                  </div>
+                  {recordingState === "listening" ? (
+                    <button type="button" onClick={stopListening}>
+                      <i />
+                      Stoppen
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => void startListening()}
+                      disabled={recordingState === "processing" || busy}
+                    >
+                      <i />
+                      Mikrofon starten
+                    </button>
+                  )}
+                </div>
                 <textarea
                   value={text}
                   onChange={(event) => setText(event.target.value)}
-                  placeholder="Schreib hier, was du unterwegs sagen oder verstehen möchtest …"
+                  placeholder="Oder schreib hier, was du unterwegs sagen oder verstehen möchtest …"
                   maxLength={8_000}
                   autoFocus
                 />
