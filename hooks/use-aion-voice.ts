@@ -50,6 +50,22 @@ type LiveVoiceMessage = {
   content: string;
 };
 
+function toSpeakableText(text: string) {
+  return text
+    .replace(/cite[^]+/g, "")
+    .replace(/\[([^\]]+)\]\(https?:\/\/[^)]+\)/g, "$1")
+    .replace(/https?:\/\/\S+/g, "")
+    .replace(/^\s*[-•]\s*/gm, "")
+    .replace(/[*_`#>|]/g, "")
+    .replace(/(\d+(?:[.,]\d+)?)\s*°\s*C\b/gi, "$1 Grad Celsius")
+    .replace(/(\d+(?:[.,]\d+)?)\s*%/g, "$1 Prozent")
+    .replace(/\bkm\/h\b/gi, "Kilometer pro Stunde")
+    .replace(/\n+/g, ". ")
+    .replace(/\s+/g, " ")
+    .replace(/\.{2,}/g, ".")
+    .trim();
+}
+
 const calendarVoicePatterns = [
   /\bkalender\w*/i,
   /\b\w*termin\w*/i,
@@ -168,9 +184,9 @@ export function useAionVoice(mode: AionMode) {
   }, []);
 
   const speak = useCallback((text: string) => {
-    const clean = text.trim();
+    const clean = toSpeakableText(text);
     if (!clean || !callActiveRef.current || !vapiRef.current) return false;
-    vapiRef.current.say(clean, false, true, true);
+    vapiRef.current.say(clean, false, true, false);
     return true;
   }, []);
 
@@ -497,18 +513,13 @@ export function useAionVoice(mode: AionMode) {
                 ]
               : [{ role: "user", content: transcript }];
 
-            vapi.say(
-              "Einen Moment, ich recherchiere das aktuell für dich.",
-              false,
-              true,
-              true,
-            );
             void fetch("/api/aion", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 mode: modeRef.current,
                 messages: liveMessages,
+                voice: true,
               }),
             })
               .then(async (result) => {
@@ -536,7 +547,10 @@ export function useAionVoice(mode: AionMode) {
                     text: answer,
                   },
                 ]);
-                vapi.say(answer, false, true, true);
+                const spokenAnswer = toSpeakableText(answer);
+                if (spokenAnswer) {
+                  vapi.say(spokenAnswer, false, true, false);
+                }
               })
               .catch((requestError) => {
                 vapi.say(
@@ -545,7 +559,7 @@ export function useAionVoice(mode: AionMode) {
                     : "Die Live-Recherche ist fehlgeschlagen.",
                   false,
                   true,
-                  true,
+                  false,
                 );
               })
               .finally(() => setState("listening"));
