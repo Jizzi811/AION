@@ -88,7 +88,42 @@ const musicVoicePatterns = [
   /\b(spiel|spiele|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?(?!eine?\s+(meditation|körperreise|traumreise))[\p{L}\p{N}]/iu,
   /\bich\s+(möchte|will)\b.+\bhören\b/i,
   /\bmach\b.+\b(musik|song|lied|von)\b.+\ban\b/i,
+  /\b(kannst|könntest|würdest)\s+du\b.+\b(spielen|abspielen|anmachen|auflegen)\b/i,
+  /\b(mach|starte|leg|lege)\b.+\b(an|auf)\b/i,
+  /\b(play|listen to|put on)\b.+/i,
 ];
+
+function hasMusicIntent(text: string) {
+  const asksForInnerAudio =
+    /\b(meditation|körperreise|traumreise|atemübung|jung[- ]?modus)\b/i.test(text);
+  const explicitlyAsksForMusic =
+    /\b(musik|song|lied|playlist|album|track|youtube|amazon music)\b/i.test(text);
+  if (asksForInnerAudio && !explicitlyAsksForMusic) return false;
+  return musicVoicePatterns.some((pattern) => pattern.test(text));
+}
+
+function extractMusicQuery(text: string) {
+  return text
+    .replace(/^\s*aion[,.]?\s*/i, "")
+    .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
+    .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
+    .replace(
+      /^\s*(kannst|könntest|würdest)\s+du\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
+      "",
+    )
+    .replace(
+      /^\s*(spiel|spiele|starte|öffne|suche|finde|hör|höre|play|put on|listen to)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
+      "",
+    )
+    .replace(/^\s*(mach|leg|lege)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i, "")
+    .replace(/^\s*ich\s+(möchte|will)\s+(gern(?:e)?\s+)?/i, "")
+    .replace(/^\s*(etwas|was|musik|einen song|ein lied)\s+(von|mit)\s+/i, "")
+    .replace(/\s+(spielen|abspielen|anmachen|hören|auflegen|an|auf)\s*[?.!]?\s*$/i, "")
+    .replace(/\s+(für mich|bitte)\s*[?.!]?\s*$/i, "")
+    .replace(/[?.!]+\s*$/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+}
 const browserVoicePatterns = [
   /\böffne\b.*\b(browser|webseite|website|internetseite)\b/i,
   /\b(geh|gehe)\b.*\bauf\b/i,
@@ -266,9 +301,7 @@ export function useAionVoice(mode: AionMode) {
           const hasLiveIntent = liveVoicePatterns.some((pattern) =>
             pattern.test(transcript),
           );
-          const hasMusicIntent = musicVoicePatterns.some((pattern) =>
-            pattern.test(transcript),
-          );
+          const hasMusicRequest = hasMusicIntent(transcript);
           const hasBrowserIntent = browserVoicePatterns.some((pattern) =>
             pattern.test(transcript),
           );
@@ -338,19 +371,8 @@ export function useAionVoice(mode: AionMode) {
             return;
           }
 
-          if (hasMusicIntent) {
-            const musicQuery = transcript
-              .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
-              .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
-              .replace(
-                /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
-                "",
-              )
-              .replace(/^\s*ich\s+(möchte|will)\s+(gern(?:e)?\s+)?/i, "")
-              .replace(/^\s*mach\s+/i, "")
-              .replace(/\s+(hören|an)\s*[.!]?\s*$/i, "")
-              .replace(/\s+/g, " ")
-              .trim();
+          if (hasMusicRequest) {
+            const musicQuery = extractMusicQuery(transcript);
             vapi.say(
               musicQuery
                 ? modeRef.current === "jung" || modeRef.current === "meditation"
@@ -392,14 +414,20 @@ export function useAionVoice(mode: AionMode) {
                 setState("listening");
               })
               .catch((requestError) => {
-                vapi.say(
+                const failureMessage =
                   requestError instanceof Error
                     ? requestError.message
-                    : "Ich konnte keinen passenden Titel finden.",
-                  false,
-                  true,
-                  true,
-                );
+                    : "Ich konnte keinen passenden Titel finden.";
+                vapi.say(failureMessage, false, true, true);
+                setMessages((current) => [
+                  ...current,
+                  {
+                    id: `${Date.now()}-${current.length}`,
+                    role: "assistant",
+                    text: `${failureMessage} Versuch es bitte mit Titel und Künstler noch einmal.`,
+                  },
+                ]);
+                setHandoff({ id: Date.now(), target: "chat" });
                 setState("listening");
               });
             return;
