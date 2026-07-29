@@ -6,6 +6,7 @@ import { AionChat } from "@/components/aion-chat";
 import { CalendarStudio } from "@/components/calendar-studio";
 import { DocumentStudio } from "@/components/document-studio";
 import { MailStudio } from "@/components/mail-studio";
+import { TranslatorStudio } from "@/components/translator-studio";
 import { useAionVoice } from "@/hooks/use-aion-voice";
 import type { AionMode } from "@/lib/aion-assistant";
 
@@ -49,6 +50,7 @@ const actions = [
   { icon: "☼", title: "Mein Morgen", text: "Wetter, Termine & Fokus", calendarStudio: true },
   { icon: "▱", title: "Dokumente", text: "PDF, Word, Excel & mehr", documentStudio: true },
   { icon: "✉", title: "Postfach", text: "E-Mails lesen & entwerfen", mailStudio: true },
+  { icon: "文", title: "Übersetzer", text: "Unterwegs überall verstanden", translatorStudio: true },
   { icon: "◐", title: "Jung-Modus", text: "Innere Muster erkunden", mode: "jung" as Mode },
   { icon: "◌", title: "Zur Ruhe", text: "Meditation & Körperreise", mode: "meditation" as Mode },
   { icon: "⌁", title: "Aktuell", text: "News & Wissen auf den Punkt", mode: "wissen" as Mode },
@@ -59,6 +61,7 @@ export default function Home() {
   const [documentStudioOpen, setDocumentStudioOpen] = useState(false);
   const [calendarStudioOpen, setCalendarStudioOpen] = useState(false);
   const [mailStudioOpen, setMailStudioOpen] = useState(false);
+  const [translatorStudioOpen, setTranslatorStudioOpen] = useState(false);
   const [chatOpen, setChatOpen] = useState(false);
   const [musicPlaying, setMusicPlaying] = useState(false);
   const {
@@ -100,6 +103,7 @@ export default function Home() {
           <button className="nav-link" onClick={() => setCalendarStudioOpen(true)}>Kalender</button>
           <button className="nav-link" onClick={() => setMailStudioOpen(true)}>Postfach</button>
           <button className="nav-link" onClick={() => setDocumentStudioOpen(true)}>Dokumente</button>
+          <button className="nav-link" onClick={() => setTranslatorStudioOpen(true)}>Übersetzer</button>
           <a href="#balance">Balance</a>
           <a href="#privacy">Privatsphäre</a>
         </nav>
@@ -261,6 +265,7 @@ export default function Home() {
                 if (action.documentStudio) setDocumentStudioOpen(true);
                 if (action.calendarStudio) setCalendarStudioOpen(true);
                 if (action.mailStudio) setMailStudioOpen(true);
+                if (action.translatorStudio) setTranslatorStudioOpen(true);
                 if (action.mode) {
                   setActiveMode(action.mode);
                   setChatOpen(true);
@@ -337,6 +342,10 @@ export default function Home() {
       <DocumentStudio open={documentStudioOpen} onClose={() => setDocumentStudioOpen(false)} />
       <CalendarStudio open={calendarStudioOpen} onClose={() => setCalendarStudioOpen(false)} />
       <MailStudio open={mailStudioOpen} onClose={() => setMailStudioOpen(false)} />
+      <TranslatorStudio
+        open={translatorStudioOpen}
+        onClose={() => setTranslatorStudioOpen(false)}
+      />
     </main>
   );
 }
