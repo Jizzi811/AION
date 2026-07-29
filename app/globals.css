@@ -1240,7 +1240,6 @@ footer > span {
   font-size: 8px;
 }
 
-.youtube-music-player > button,
 .youtube-music-player > a {
   display: flex;
   width: calc(100% - 24px);
@@ -1259,11 +1258,54 @@ footer > span {
   text-decoration: none;
 }
 
+.youtube-player-shell {
+  position: relative;
+  overflow: hidden;
+  background: #000;
+}
+
 .youtube-player-frame {
   width: 100%;
   min-height: 220px;
   aspect-ratio: 16 / 9;
   background: #000;
+}
+
+.youtube-play-overlay {
+  position: absolute;
+  z-index: 2;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 9px;
+  width: 100%;
+  border: 0;
+  background:
+    radial-gradient(circle at center, rgba(var(--accent-rgb), 0.24), transparent 55%),
+    rgba(4, 3, 10, 0.78);
+  color: #f5f3fb;
+  cursor: pointer;
+  font: inherit;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  backdrop-filter: blur(5px);
+}
+
+.youtube-play-overlay span {
+  display: grid;
+  width: 39px;
+  height: 39px;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #080612;
+  box-shadow: 0 0 28px rgba(var(--accent-rgb), 0.5);
+}
+
+.youtube-play-overlay:disabled {
+  cursor: wait;
+  opacity: 0.74;
 }
 
 .youtube-player-frame iframe {
