@@ -14,11 +14,14 @@ type YouTubeSearchItem = {
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const genericMusicQueryPattern =
+  /^(hören|listen|musik|music|etwas|was|song|lied|track|album|playlist|spielen|abspielen)$/i;
+
 export async function GET(request: Request) {
   const query = new URL(request.url).searchParams.get("q")?.trim();
   const apiKey = process.env.YOUTUBE_API_KEY;
 
-  if (!query) {
+  if (!query || genericMusicQueryPattern.test(query)) {
     return Response.json({ error: "Bitte nenne einen Titel, Künstler oder eine Stimmung." }, { status: 400 });
   }
   if (!apiKey) {
@@ -33,6 +36,7 @@ export async function GET(request: Request) {
     type: "video",
     videoCategoryId: "10",
     videoEmbeddable: "true",
+    videoSyndicated: "true",
     safeSearch: "moderate",
     maxResults: "1",
     q: query,
@@ -40,6 +44,7 @@ export async function GET(request: Request) {
   });
 
   try {
+    console.info("[api/youtube/search] request", { queryLength: query.length });
     const response = await fetch(
       `https://www.googleapis.com/youtube/v3/search?${searchParams.toString()}`,
       { cache: "no-store" },
@@ -56,6 +61,7 @@ export async function GET(request: Request) {
     const result = body.items?.find((item) => item.id?.videoId);
     const videoId = result?.id?.videoId;
     if (!result || !videoId) {
+      console.warn("[api/youtube/search] no playable result");
       return Response.json(
         { error: "Dazu habe ich gerade keinen abspielbaren Titel gefunden." },
         { status: 404 },
@@ -63,6 +69,7 @@ export async function GET(request: Request) {
     }
 
     const thumbnails = result.snippet?.thumbnails;
+    console.info("[api/youtube/search] success", { videoId });
     return Response.json({
       video: {
         id: videoId,
@@ -76,6 +83,9 @@ export async function GET(request: Request) {
       },
     });
   } catch (error) {
+    console.error("[api/youtube/search] failed", {
+      message: error instanceof Error ? error.message : "Unknown error",
+    });
     return Response.json(
       {
         error:
