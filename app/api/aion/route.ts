@@ -1,6 +1,7 @@
 import OpenAI from "openai";
 import { auth } from "@/auth";
 import { buildAionTextInstructions, type AionMode } from "@/lib/aion-assistant";
+import { answerWeatherQuestion } from "@/lib/weather";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,16 @@ const livePatterns = [
   /\böffnungszeiten\b/i,
   /\bwer ist\b/i,
   /\b202[5-9]\b/,
+];
+const weatherPatterns = [
+  /\bwetter\w*/i,
+  /\bprognose\b/i,
+  /\btemperatur\w*/i,
+  /\bregnet\b/i,
+  /\bregen\b/i,
+  /\bschneit\b/i,
+  /\bsonnig\b/i,
+  /\bwindig\b/i,
 ];
 const calendarPatterns = [
   /\bkalender\w*/i,
@@ -300,12 +311,17 @@ Schreibe Einheiten sprechbar aus, zum Beispiel Grad Celsius, Prozent und Kilomet
 Beginne direkt mit der Antwort und wiederhole weder die Frage noch die Ankündigung der Recherche.`
       : "";
     const lastQuestion = messages[messages.length - 1].content;
+    const conversationText = messages.map((message) => message.content).join("\n");
+    const hasWeatherIntent =
+      !documentContent &&
+      weatherPatterns.some((pattern) => pattern.test(conversationText));
     const hasCalendarIntent =
       !documentContent && calendarPatterns.some((pattern) => pattern.test(lastQuestion));
     const calendarEvents = hasCalendarIntent ? await loadCalendarContext() : undefined;
     const useLiveSearch =
       !documentContent &&
       !hasCalendarIntent &&
+      !hasWeatherIntent &&
       (mode === "wissen" || livePatterns.some((pattern) => pattern.test(lastQuestion)));
     const documentContext = documentContent
       ? `\n\nDOKUMENTKONTEXT
@@ -324,6 +340,32 @@ ${documentContent}
         live: false,
         sources: [],
       });
+    }
+
+    if (hasWeatherIntent) {
+      try {
+        const weather = await answerWeatherQuestion(lastQuestion, {
+          isFollowUp:
+            messages.length > 1 &&
+            messages.slice(0, -1).some((message) => weatherPatterns.some((pattern) => pattern.test(message.content))),
+        });
+        return Response.json({
+          message: weather.message,
+          speechMessage: weather.speechMessage,
+          weatherLocation: weather.location,
+          live: true,
+          sources: [weather.source],
+        });
+      } catch (weatherError) {
+        console.error("[weather] request failed", weatherError);
+        return Response.json(
+          {
+            error:
+              "Der weltweite Wetterdienst ist gerade nicht erreichbar. Bitte versuche es gleich noch einmal.",
+          },
+          { status: 502 },
+        );
+      }
     }
 
     const calendarContext = calendarEvents
