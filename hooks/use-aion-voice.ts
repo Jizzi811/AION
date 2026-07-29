@@ -85,6 +85,9 @@ const musicVoicePatterns = [
   /\byoutube(?: music)?\b/i,
   /\bmusik\b.*\b(spiel|abspiel|hör|amazon)\w*/i,
   /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i,
+  /\b(spiel|spiele|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?(?!eine?\s+(meditation|körperreise|traumreise))[\p{L}\p{N}]/iu,
+  /\bich\s+(möchte|will)\b.+\bhören\b/i,
+  /\bmach\b.+\b(musik|song|lied|von)\b.+\ban\b/i,
 ];
 const browserVoicePatterns = [
   /\böffne\b.*\b(browser|webseite|website|internetseite)\b/i,
@@ -325,9 +328,12 @@ export function useAionVoice(mode: AionMode) {
               .replace(/\b(auf|bei|über|in)\s+(amazon|youtube) music\b/gi, "")
               .replace(/\b(amazon|youtube)(?: music)?\b/gi, "")
               .replace(
-                /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?/i,
+                /^\s*(aion[,.]?\s*)?(spiel|spiele|starte|öffne|suche|finde|hör|höre)\s+(mir\s+)?(mal\s+)?(bitte\s+)?/i,
                 "",
               )
+              .replace(/^\s*ich\s+(möchte|will)\s+(gern(?:e)?\s+)?/i, "")
+              .replace(/^\s*mach\s+/i, "")
+              .replace(/\s+(hören|an)\s*[.!]?\s*$/i, "")
               .replace(/\s+/g, " ")
               .trim();
             vapi.say(
