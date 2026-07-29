@@ -171,8 +171,39 @@ export function useAionVoice(mode: AionMode) {
     target: "chat" | "mail";
   } | null>(null);
 
+  const lastAppliedModeRef = useRef(mode);
+
   useEffect(() => {
+    const previousMode = lastAppliedModeRef.current;
     modeRef.current = mode;
+
+    if (previousMode === mode) return;
+    lastAppliedModeRef.current = mode;
+
+    if (!callActiveRef.current || !vapiRef.current) return;
+
+    pendingCalendarActionRef.current = null;
+    pendingLiveContextRef.current = null;
+
+    const modeNames: Record<AionMode, string> = {
+      alltag: "Alltagsmodus",
+      jung: "Jung-Modus",
+      meditation: "Meditationsmodus",
+      wissen: "Wissensmodus",
+    };
+
+    vapiRef.current.send({
+      type: "add-message",
+      message: {
+        role: "system",
+        content:
+          `Die Nutzerin hat über die Oberfläche bewusst in den ${modeNames[mode]} gewechselt. ` +
+          `Ab jetzt ist "${mode}" der aktive Modus. Wende sofort die bereits definierten Regeln, ` +
+          `den Tonfall und das Verhalten dieses Modus an. Die laufende Sprachverbindung bleibt bestehen. ` +
+          `Bestätige den Wechsel nicht ungefragt und warte auf die nächste Äußerung der Nutzerin.`,
+      },
+      triggerResponseEnabled: false,
+    });
   }, [mode]);
 
   const stop = useCallback(() => {
@@ -605,10 +636,6 @@ export function useAionVoice(mode: AionMode) {
       vapiRef.current?.removeAllListeners?.();
     };
   }, []);
-
-  useEffect(() => {
-    if (state !== "idle") stop();
-  }, [mode]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return {
     state,
