@@ -28,6 +28,7 @@ export type TranscriptItem = {
   calendarAction?: CalendarVoiceAction;
   calendarConnectionRequired?: boolean;
   musicUrl?: string;
+  browserUrl?: string;
 };
 
 type VapiMessage = {
@@ -76,6 +77,12 @@ const musicVoicePatterns = [
   /\bamazon music\b/i,
   /\bmusik\b.*\b(spiel|abspiel|hör|amazon)\w*/i,
   /\b(spiel|spiele|starte)\b.*\b(song|lied|album|playlist|musik)\b/i,
+];
+const browserVoicePatterns = [
+  /\böffne\b.*\b(browser|webseite|website|internetseite)\b/i,
+  /\b(geh|gehe)\b.*\bauf\b/i,
+  /\bgoogle\b.*\b(nach|suche)\b/i,
+  /\bsuche\b.*\b(im|mit dem)\s+(internet|browser|web)\b/i,
 ];
 const voiceYesPattern =
   /^\s*(ja|ja bitte|ja genau|ja mach das|bitte|genau|okay|ok|mach das|eintragen|bestätigt)\s*[.!]?\s*$/i;
@@ -236,6 +243,9 @@ export function useAionVoice(mode: AionMode) {
           const hasMusicIntent = musicVoicePatterns.some((pattern) =>
             pattern.test(transcript),
           );
+          const hasBrowserIntent = browserVoicePatterns.some((pattern) =>
+            pattern.test(transcript),
+          );
 
           if (hasCalendarIntent) {
             void fetch("/api/aion", {
@@ -325,6 +335,43 @@ export function useAionVoice(mode: AionMode) {
                   ? `Ich habe „${musicQuery}“ für Amazon Music vorbereitet. Tippe im Chat auf „In Amazon Music öffnen“.`
                   : "Ich habe Amazon Music für dich vorbereitet. Tippe im Chat auf „In Amazon Music öffnen“.",
                 musicUrl,
+              },
+            ]);
+            setHandoff({ id: Date.now(), target: "chat" });
+            setState("idle");
+            return;
+          }
+
+          if (hasBrowserIntent) {
+            const browserQuery = transcript
+              .replace(
+                /^\s*(aion[,.]?\s*)?(öffne|suche|finde|google|geh|gehe)\s+(mir\s+)?/i,
+                "",
+              )
+              .replace(/\b(im|mit dem)\s+(internet|browser|web)\b/gi, "")
+              .replace(/^\s*(die|das|den|nach|auf)\s+/i, "")
+              .replace(/\s+/g, " ")
+              .trim();
+            const domain = browserQuery.match(
+              /\b(?:https?:\/\/)?(?:www\.)?(?:[a-z0-9-]+\.)+[a-z]{2,}(?:\/[^\s]*)?\b/i,
+            )?.[0];
+            const browserUrl = domain
+              ? /^https?:\/\//i.test(domain)
+                ? domain
+                : `https://${domain}`
+              : browserQuery
+                ? `https://www.google.com/search?q=${encodeURIComponent(browserQuery)}`
+                : "https://www.google.com";
+            vapi.stop();
+            setMessages((current) => [
+              ...current,
+              {
+                id: `${Date.now()}-${current.length}`,
+                role: "assistant",
+                text: browserQuery
+                  ? `Ich habe „${browserQuery}“ für den Browser vorbereitet. Öffne den geprüften Link im Chat.`
+                  : "Ich habe den Browser für dich vorbereitet. Öffne den Link im Chat.",
+                browserUrl,
               },
             ]);
             setHandoff({ id: Date.now(), target: "chat" });
