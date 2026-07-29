@@ -102,6 +102,7 @@ const voiceNoPattern =
 
 export function useAionVoice(mode: AionMode) {
   const vapiRef = useRef<Vapi | null>(null);
+  const callActiveRef = useRef(false);
   const modeRef = useRef(mode);
   const pendingCalendarActionRef = useRef<CalendarVoiceAction | null>(null);
   const pendingLiveContextRef = useRef<LiveVoiceMessage[] | null>(null);
@@ -120,8 +121,16 @@ export function useAionVoice(mode: AionMode) {
   const stop = useCallback(() => {
     pendingCalendarActionRef.current = null;
     pendingLiveContextRef.current = null;
+    callActiveRef.current = false;
     vapiRef.current?.stop();
     setState("idle");
+  }, []);
+
+  const speak = useCallback((text: string) => {
+    const clean = text.trim();
+    if (!clean || !callActiveRef.current || !vapiRef.current) return false;
+    vapiRef.current.say(clean, false, true, true);
+    return true;
   }, []);
 
   const start = useCallback(async () => {
@@ -143,8 +152,14 @@ export function useAionVoice(mode: AionMode) {
         const VapiConstructor = (await import("@vapi-ai/web")).default;
         const vapi = new VapiConstructor(publicKey);
 
-        vapi.on("call-start", () => setState("listening"));
-        vapi.on("call-end", () => setState("idle"));
+        vapi.on("call-start", () => {
+          callActiveRef.current = true;
+          setState("listening");
+        });
+        vapi.on("call-end", () => {
+          callActiveRef.current = false;
+          setState("idle");
+        });
         vapi.on("speech-start", () => setState("speaking"));
         vapi.on("speech-end", () => setState("listening"));
         vapi.on("message", (message: VapiMessage) => {
@@ -361,7 +376,6 @@ export function useAionVoice(mode: AionMode) {
                 if (!result.ok || !body.video) {
                   throw new Error(body.error || "Ich konnte keinen passenden Titel finden.");
                 }
-                vapi.stop();
                 setMessages((current) => [
                   ...current,
                   {
@@ -375,7 +389,7 @@ export function useAionVoice(mode: AionMode) {
                   },
                 ]);
                 setHandoff({ id: Date.now(), target: "chat" });
-                setState("idle");
+                setState("listening");
               })
               .catch((requestError) => {
                 vapi.say(
@@ -411,7 +425,6 @@ export function useAionVoice(mode: AionMode) {
               : browserQuery
                 ? `https://www.google.com/search?q=${encodeURIComponent(browserQuery)}`
                 : "https://www.google.com";
-            vapi.stop();
             setMessages((current) => [
               ...current,
               {
@@ -424,7 +437,7 @@ export function useAionVoice(mode: AionMode) {
               },
             ]);
             setHandoff({ id: Date.now(), target: "chat" });
-            setState("idle");
+            setState("listening");
             return;
           }
 
@@ -497,7 +510,6 @@ export function useAionVoice(mode: AionMode) {
           }
 
           if (hasMailIntent) {
-            vapi.stop();
             setMessages((current) => [
               ...current,
               {
@@ -508,7 +520,7 @@ export function useAionVoice(mode: AionMode) {
               },
             ]);
             setHandoff({ id: Date.now(), target: "mail" });
-            setState("idle");
+            setState("listening");
           }
         });
         vapi.on("error", () => {
@@ -546,6 +558,7 @@ export function useAionVoice(mode: AionMode) {
     messages,
     start,
     stop,
+    speak,
     handoff,
     clearHandoff: () => setHandoff(null),
   };
