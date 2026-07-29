@@ -1116,7 +1116,8 @@ footer > span {
 }
 
 .chat-calendar-connect,
-.chat-music-link {
+.chat-music-link,
+.chat-browser-link {
   display: inline-flex;
   align-items: center;
   gap: 6px;
